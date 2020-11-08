@@ -1,7 +1,6 @@
 import numpy as np
 import numpy.linalg as la
 from scipy import constants as cnst
-import pandas as pd
 
 
 def calculate_trajectory():
@@ -66,7 +65,6 @@ def driver(f, a, ya, b, yb, h, acc, eps, stepper, limit, max_factor):
     t = np.nan(shape=(1000,))
 
     x = a   # current last step
-    x0 = a  # the step before that
     yx = ya
     yx0 = ya
 
