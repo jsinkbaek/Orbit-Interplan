@@ -1,17 +1,43 @@
 import numpy as np
 import numpy.linalg as la
 from scipy import constants as cnst
+import pandas as pd
 
 
-def acceleration(r, mass):
+def calculate_trajectory():
+    print('test')
+
+
+def equations(t, r, objects):
+    """
+    Sets up 6 ordinary differential equations to solve the problem by calculating the acceleration on the satellite due
+    to gravitational effects from objects.
+    :param t: Current time
+    :param r: Current r vector (x,y,z,vx,vy,vz)
+    :param objects: an object storing information about the planetoid objects. object.mass should give a 1d array of
+                    all the planetoid masses needed, in order. object.ephemeris(t) should give a (3, nobjects) array
+                    of current position of all planetoids needed, in solar cartesian coordinates.
+    :return: vector dr with dx,dy,dz,ddx,ddy,ddz
+    """
+    dr = np.empty(r.shape)
+    dr[0:2] = r[3:]
+    obj_pos = objects.ephemeris(t)
+    positions = np.empty((3, obj_pos[0, :].size+1))
+    positions[:, 0] = r[0:2]
+    positions[:, 1:] = obj_pos
+    dr[3:] = acceleration(positions, objects.mass)
+    return dr
+
+
+def acceleration(positions, mass):
     """
     Calculates satellite acceleration given newtonian forces from multiple masses.
-    :param r: position in solar cartesian system. r[:,0] is satellite, r[:,1] is sun, then other objects. numpy 3d array
-              size (3, len(mass[0,:])+1)
+    :param positions: position in solar cartesian system. [:,0] is satellite, [:,1] is sun, then other objects.
+                      numpy 3d array size (3, len(mass[0,:])+1)
     :param mass: masses of objects. mass[0] is sun, then other objects. numpy 2d array size (1, nobjects)
     :return: returns resulting acceleration a at point r[:, 0]. Should be ndarray with size (3, 1)
     """
-    rij = r[:, 1:] - r[:, 0]
+    rij = positions[:, 1:] - positions[:, 0]
     distance = la.norm(rij, axis=0)  # distance[0] is distance to sun
     print(np.size(distance))
     a = cnst.G * np.sum(mass * rij / (distance**3), axis=1)
