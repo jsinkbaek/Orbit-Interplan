@@ -3,10 +3,6 @@ import numpy.linalg as la
 from scipy import constants as cnst
 
 
-def calculate_trajectory():
-    print('test')
-
-
 def equations(t, r, objects):
     """
     Sets up 6 ordinary differential equations to solve the problem by calculating the acceleration on the satellite due
@@ -51,7 +47,7 @@ def driver(f, a, ya, b, yb, h, acc, eps, stepper, limit, max_factor):
     :param a: start-point a
     :param ya: initial values y(a)
     :param b: expected end-point t
-    :param yb: wanted end-value
+    :param yb: wanted end-value (only 1/2 length of y as derivative is not needed)
     :param h: initial stepsize
     :param acc: absolute accuracy goal
     :param eps: relative accuracy goal
@@ -59,16 +55,18 @@ def driver(f, a, ya, b, yb, h, acc, eps, stepper, limit, max_factor):
     :param limit: limit on number of steps allowed
     :param max_factor: limit on step factor increase
     :return: r, t: returns vector r with x,y,z,vx,vy,vz and time points t
+
+    is fixed to ya length of 6 (3 cartesian coordinates, 3 cartesian velocities) due to while loop conditions
     """
     nsteps = 0
-    r = np.nan(shape=(3, 1000))
+    r = np.nan(shape=(6, 1000))
     t = np.nan(shape=(1000,))
 
     x = a   # current last step
     yx = ya
     yx0 = ya
 
-    while la.norm(yx - yb, axis=0) < la.norm(yx0 - yb, axis=0):
+    while la.norm(yx[0:2] - yb, axis=0) < la.norm(yx0[0:2] - yb, axis=0):
         nsteps += 1
         if x+h > b:
             h = b-x

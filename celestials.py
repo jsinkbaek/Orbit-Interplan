@@ -5,6 +5,10 @@ from astropy.coordinates import get_body_barycentric, get_body_barycentric_posve
 
 
 class CelestialBody:
+    """
+    Class of objects called CelestialBody. Used to define celestial bodies necessary to calculate trajectory of
+    spacecraft.
+    """
     solar_system_ephemeris.set('de432s')
 
     def __init__(self, name, mass, kind, parent, a):
@@ -12,7 +16,7 @@ class CelestialBody:
         self.mass = mass
         self.kind = kind
         self.parent = parent
-        self.a = a
+        self.a = a           # semi-major axis
 
     def get_barycentric(self, t):
         pos = get_body_barycentric(self.name, t).to_value      # cartesian representation in km
@@ -31,6 +35,9 @@ class CelestialBody:
 
 
 class CelestialGroup:
+    """
+    Class used to group multiple CelestialObjects together for convenient storage and access of values.
+    """
 
     def __init__(self, *args):
         self.objects = np.empty((0, ), dtype=type(CelestialBody))
