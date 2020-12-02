@@ -16,16 +16,16 @@ class CelestialBody:
         self.mass = mass
         self.kind = kind
         self.parent = parent
-        self.a = a * 1.496 * 1e8           # semi-major axis in km
+        self.a = a * 1.496 * 1e11           # semi-major axis in km
 
     def get_barycentric(self, t, t0=2451545., tformat='jd'):
         t_ = Time(t+t0, format=tformat)
-        pos = get_body_barycentric(self.name, t_).xyz.to('km').to_value()      # cartesian representation in au
+        pos = get_body_barycentric(self.name, t_).xyz.to('m').to_value()      # cartesian representation in m
         return pos
 
     def get_barycentric_vel(self, t, t0=2451545, tformat='jd'):
         t_ = Time(t + t0, format=tformat)
-        vel = get_body_barycentric_posvel(self.name, t_)[1].xyz.to('km/s').to_value()
+        vel = get_body_barycentric_posvel(self.name, t_)[1].xyz.to('m/s').to_value()
         return vel
 
     def sphere_of_influence(self):

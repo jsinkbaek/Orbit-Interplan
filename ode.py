@@ -35,11 +35,11 @@ def acceleration(positions, mass):
     """
     rij = positions[:, 1:] - positions[:, 0].reshape((len(positions[:, 0]), 1))
     distance = la.norm(rij, axis=0)  # distance[0] is distance to sun
-    a = cnst.G * np.sum(mass * rij / (distance**3), axis=1)
+    a = cnst.G * np.sum(5.9722 * 1e24 * mass * rij / (distance**3), axis=1)  # factor us earth mass to kg
     return a
 
 
-def driver(f, a, ya, b, yb, h, acc, eps, stepper, limit, max_factor, estimate_endpos=True):
+def driver(f, a, ya, b, yb, h, acc, eps, stepper, limit, max_factor, estimate_endpos=True, max_stepsize=None):
     """
     Adaptive ode driver that advances solution by calling rkXX stepper and adjusts to appropriate step sizes.
     Stops at closest approach to a wanted position yb.
@@ -55,6 +55,7 @@ def driver(f, a, ya, b, yb, h, acc, eps, stepper, limit, max_factor, estimate_en
     :param limit: limit on number of steps allowed
     :param max_factor: limit on step factor increase
     :param estimate_endpos: if True, driver will stop close to yb. If False, driver will stop when x >= b
+    :param max_stepsize: limit on the size of each step, as fraction of b-a. If None, not used.
     :return: r, t: returns vector r with x,y,z,vx,vy,vz and time points t
 
     is fixed to ya length of 6 (3 cartesian coordinates, 3 cartesian velocities) due to while loop conditions
@@ -112,6 +113,9 @@ def driver(f, a, ya, b, yb, h, acc, eps, stepper, limit, max_factor, estimate_en
         if adj_factor > max_factor:
             adj_factor = max_factor
         h = h*adj_factor
+        if max_stepsize is not None:
+            if h > max_stepsize * (b-a):
+                h = max_stepsize * (b-a)
         if nsteps >= limit:
             print("Step limit exceeded, returning current result")
             break
@@ -147,8 +151,8 @@ def rk45_step(f, t, yt, h):
 
     yh = yt + np.sum(k*b5, axis=1)
     err = yh - yt - np.sum(k*b4, axis=1)
-    print('yh', yh)
-    print('err', err)
+    # print('yh', yh)
+    # print('err', err)
     return yh, err
 
 

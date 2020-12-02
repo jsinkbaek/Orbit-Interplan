@@ -24,15 +24,28 @@ moon = CelestialBody('moon', 0.0123000371, 'moon', earth, 0.002572)
 
 solar_system = CelestialGroup(sun, mercury, venus, earth, mars, jupiter, saturn, uranus, neptune, moon)
 
-distance = 10000
-t_jd = np.double(200)
+distance = 381000
+t_jd = np.double(800)
 v_circ = np.sqrt(cnst.G * earth.mass / distance)
 satellite_pos = earth.get_barycentric(t_jd) + np.array([distance, 0, 0])
 satellite_vel = earth.get_barycentric_vel(t_jd) + np.array([0, v_circ, 0])
 billy = SpaceCraft(satellite_pos, t_jd, satellite_vel, solar_system)
+dt = 3000
 
-ts, ys = billy.calculate_trajectory(t_jd+1500)
+
+plt.plot()
+ts, ys = billy.calculate_trajectory(t_jd+dt, max_stepsize=0.01)
 pos_res = ys[0:3, :]
-pos_rela = pos_res - earth.get_barycentric(ts)
-plt.plot(pos_rela[0, :], pos_rela[1, :])
+pos_rela = pos_res # - earth.get_barycentric(ts)
+moon_rela = moon.get_barycentric(ts) # - earth.get_barycentric(ts)
+# plt.plot(moon_rela[0, :], moon_rela[1, :], 'k.')
+plt.plot(pos_rela[0, :], pos_rela[1, :], 'b*')
+ts, ys = billy.calculate_trajectory(t_jd+dt)
+pos_res = ys[0:3, :]
+pos_rela = pos_res # - earth.get_barycentric(ts)
+# plt.plot(pos_rela[0, :], pos_rela[1, :], 'r*')
+print(pos_rela[:, 23])
+print(pos_rela[:, 24])
+print(pos_rela[:, 25])
+print(pos_rela[:, 26])
 plt.show()
