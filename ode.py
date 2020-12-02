@@ -15,10 +15,11 @@ def equations(t, r, objects):
     :return: vector dr with dx,dy,dz,ddx,ddy,ddz
     """
     dr = np.empty(r.shape)
-    dr[0:2] = r[3:]
+    dr[0:3] = r[3:6]
     obj_pos = objects.ephemeris(t)
+
     positions = np.empty((3, obj_pos[0, :].size+1))
-    positions[:, 0] = r[0:2]
+    positions[:, 0] = r[0:3]
     positions[:, 1:] = obj_pos
     dr[3:] = acceleration(positions, objects.mass)
     return dr
@@ -32,9 +33,8 @@ def acceleration(positions, mass):
     :param mass: masses of objects. mass[0] is sun, then other objects. numpy 2d array size (1, nobjects)
     :return: returns resulting acceleration a at point r[:, 0]. Should be ndarray with size (3, 1)
     """
-    rij = positions[:, 1:] - positions[:, 0]
+    rij = positions[:, 1:] - positions[:, 0].reshape((len(positions[:, 0]), 1))
     distance = la.norm(rij, axis=0)  # distance[0] is distance to sun
-    print(np.size(distance))
     a = cnst.G * np.sum(mass * rij / (distance**3), axis=1)
     return a
 
@@ -60,12 +60,15 @@ def driver(f, a, ya, b, yb, h, acc, eps, stepper, limit, max_factor, estimate_en
     is fixed to ya length of 6 (3 cartesian coordinates, 3 cartesian velocities) due to while loop conditions
     """
     nsteps = 0
-    r = np.nan(shape=(6, 1000))
-    t = np.nan(shape=(1000,))
+    r = np.empty(shape=(6, limit), dtype=np.double)
+    t = np.empty(shape=(limit,), dtype=np.double)
+    r[:] = np.NaN
+    t[:] = np.NaN
 
     x = a   # current last step
     yx = ya
     yx0 = ya
+    k = 0
     if estimate_endpos:
         condition = la.norm(yx[0:2] - yb, axis=0) < la.norm(yx0[0:2] - yb, axis=0)
     else:
@@ -86,7 +89,7 @@ def driver(f, a, ya, b, yb, h, acc, eps, stepper, limit, max_factor, estimate_en
         accept = True
         tol_ratio = np.ones(err.size)
         for i in range(0, tau.size):
-            tol_ratio[i] = tau[i]/err[i]
+            tol_ratio[i] = np.abs(tau[i]/err[i])
             if tol_ratio[i] < 1:
                 accept = False
 
@@ -95,15 +98,16 @@ def driver(f, a, ya, b, yb, h, acc, eps, stepper, limit, max_factor, estimate_en
             x += h
             yx0 = yx
             yx = yh
-            t[:, nsteps] = x
-            r[:, nsteps] = yx
+            t[k] = x
+            r[:, k] = yx
+            k += 1
         else:
             print("Bad step at x = ", x)
             print("Step rejected")
         # Adjust stepsize based on empirical formula
         tol_min = tol_ratio[0]
         for i in range(1, tol_ratio.size):
-            tol_min = np.min(tol_min, tol_ratio[i])
+            tol_min = np.min([tol_min, tol_ratio[i]])
         adj_factor = np.power(tol_min, 0.25)*0.95
         if adj_factor > max_factor:
             adj_factor = max_factor
@@ -115,7 +119,8 @@ def driver(f, a, ya, b, yb, h, acc, eps, stepper, limit, max_factor, estimate_en
             condition = la.norm(yx[0:2] - yb, axis=0) < la.norm(yx0[0:2] - yb, axis=0)
         else:
             condition = x < b
-
+    t = np.where(np.isfinite(t), t, 0)
+    r = np.where(np.isfinite(r), r, 0)
     print("ODE solved in ", nsteps, " steps")
     return r, t
 
@@ -142,6 +147,8 @@ def rk45_step(f, t, yt, h):
 
     yh = yt + np.sum(k*b5, axis=1)
     err = yh - yt - np.sum(k*b4, axis=1)
+    print('yh', yh)
+    print('err', err)
     return yh, err
 
 

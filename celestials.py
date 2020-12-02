@@ -16,14 +16,16 @@ class CelestialBody:
         self.mass = mass
         self.kind = kind
         self.parent = parent
-        self.a = a           # semi-major axis
+        self.a = a * 1.496 * 1e8           # semi-major axis in km
 
-    def get_barycentric(self, t):
-        pos = get_body_barycentric(self.name, t).to_value      # cartesian representation in km
+    def get_barycentric(self, t, t0=2451545., tformat='jd'):
+        t_ = Time(t+t0, format=tformat)
+        pos = get_body_barycentric(self.name, t_).xyz.to('km').to_value()      # cartesian representation in au
         return pos
 
-    def get_barycentric_vel(self, t):
-        vel = get_body_barycentric_posvel(self.name, t).to_value
+    def get_barycentric_vel(self, t, t0=2451545, tformat='jd'):
+        t_ = Time(t + t0, format=tformat)
+        vel = get_body_barycentric_posvel(self.name, t_)[1].xyz.to('km/s').to_value()
         return vel
 
     def sphere_of_influence(self):
@@ -46,7 +48,7 @@ class CelestialGroup:
         self.parents = np.empty((0, ))
         self.kinds = np.empty((0, ))
         for arg in args:
-            if type(arg) is not type(CelestialBody):
+            if type(arg) is not CelestialBody:
                 raise TypeError('CelestialGroup __init__. Type of argument is not CelestialBody.')
             self.objects = np.append(self.objects, arg)
             self.names = np.append(self.names, arg.name)
@@ -55,13 +57,13 @@ class CelestialGroup:
             self.kinds = np.append(self.kinds, arg.kind)
         self.n = len(self.names)
 
-    def ephemeris(self, t):
+    def ephemeris(self, t, t0=2451545, tformat='jd'):
         pos = np.empty((3, self.n))
         for i in range(0, self.n):
-            pos[i] = self.objects[i].get_barycentric(t)
+            pos[:, i] = self.objects[i].get_barycentric(t, t0, tformat)
         return pos
 
     def get_body(self, name):
-        return self.objects[np.where(self.names == name)]
+        return self.objects[np.where(self.names == name)][0]
 
 

@@ -69,7 +69,7 @@ class SpaceCraft:
         for body in system_bodies.objects:
             if body.name is not 'sun':
                 r_soi = body.sphere_of_influence()
-                if np.abs(body.get_barycentric - self.pos) < r_soi:
+                if la.norm(body.get_barycentric(self.t) - self.pos) < r_soi:
                     within_sphere = np.append(within_sphere, body)
         if len(within_sphere) == 0:
             return system_bodies.get_body('sun')
