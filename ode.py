@@ -39,7 +39,7 @@ def acceleration(positions, mass):
     return a
 
 
-def driver(f, a, ya, b, yb, h, acc, eps, stepper, limit, max_factor):
+def driver(f, a, ya, b, yb, h, acc, eps, stepper, limit, max_factor, estimate_endpos=True):
     """
     Adaptive ode driver that advances solution by calling rkXX stepper and adjusts to appropriate step sizes.
     Stops at closest approach to a wanted position yb.
@@ -54,6 +54,7 @@ def driver(f, a, ya, b, yb, h, acc, eps, stepper, limit, max_factor):
     :param stepper: stepping function rkXX_step
     :param limit: limit on number of steps allowed
     :param max_factor: limit on step factor increase
+    :param estimate_endpos: if True, driver will stop close to yb. If False, driver will stop when x >= b
     :return: r, t: returns vector r with x,y,z,vx,vy,vz and time points t
 
     is fixed to ya length of 6 (3 cartesian coordinates, 3 cartesian velocities) due to while loop conditions
@@ -65,8 +66,11 @@ def driver(f, a, ya, b, yb, h, acc, eps, stepper, limit, max_factor):
     x = a   # current last step
     yx = ya
     yx0 = ya
-
-    while la.norm(yx[0:2] - yb, axis=0) < la.norm(yx0[0:2] - yb, axis=0):
+    if estimate_endpos:
+        condition = la.norm(yx[0:2] - yb, axis=0) < la.norm(yx0[0:2] - yb, axis=0)
+    else:
+        condition = x < b
+    while condition:
         nsteps += 1
         if x+h > b:
             h = b-x
@@ -107,6 +111,10 @@ def driver(f, a, ya, b, yb, h, acc, eps, stepper, limit, max_factor):
         if nsteps >= limit:
             print("Step limit exceeded, returning current result")
             break
+        if estimate_endpos:
+            condition = la.norm(yx[0:2] - yb, axis=0) < la.norm(yx0[0:2] - yb, axis=0)
+        else:
+            condition = x < b
 
     print("ODE solved in ", nsteps, " steps")
     return r, t

@@ -18,40 +18,53 @@ class SpaceCraft:
         self.velocity_cb = self.get_cb_vel()
         self.system_bodies = system_bodies
 
-    def update(self, pos, t, v, system_bodies):
+    def update(self, pos, t, v, system_bodies=None):
+        if system_bodies is None:
+            system_bodies = self.system_bodies
         self.pos = pos
         self.t = t
         self.current_body = self.get_current_body(system_bodies)
         self.velocity = v
         self.velocity_cb = self.get_cb_vel()
 
-    def calculate_trajectory(self, expected_endtime, expected_endpos, system_bodies):
+    def calculate_trajectory(self, expected_endtime, expected_endpos=None, system_bodies=None):
         """
         Calls ode.driver to integrate path until nearest expected_endpos.
         """
+        if system_bodies is None:
+            system_bodies = self.system_bodies
+
         # Wrapper
         def ode_equations(_t, _r):
             return ode.equations(_t, _r, system_bodies)
 
+        if expected_endpos is None:
+            estimate_endpos = False
+        else:
+            estimate_endpos = True
         initial_y = np.append(self.pos, self.velocity)
         ys, ts = ode.driver(ode_equations, self.t, initial_y, expected_endtime, expected_endpos, h=0.1, acc=1e-3,
-                            eps=1e-3, stepper=ode.rk45_step, limit=2000, max_factor=2)
+                            eps=1e-3, stepper=ode.rk45_step, limit=2000, max_factor=2, estimate_endpos=estimate_endpos)
         return ts, ys
 
-    def circular_speed(self, body):
+    def circular_speed(self, body=None):
         """
         Estimates speed around indicated body if SpaceCraft is in circular orbit around it.
         """
+        if body is None:
+            body = self.get_current_body()
         relative_pos = self.pos - body.get_barycentric(self.t)
         distance = la.norm(relative_pos, axis=0)
         speed = np.sqrt(cnst.G * body.mass / distance)
         return speed
 
-    def get_current_body(self, system_bodies):
+    def get_current_body(self, system_bodies=None):
         """
         Finds out which body SpaceCraft is primarily within sphere of influence of (in case of both moon and planet,
         moon is selected).
         """
+        if system_bodies is None:
+            system_bodies = self.system_bodies
         within_sphere = np.empty((0, ), dtype=type(CelestialBody))
         for body in system_bodies.objects:
             if body.name is not 'sun':
