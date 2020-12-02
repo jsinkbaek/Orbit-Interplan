@@ -16,6 +16,7 @@ class SpaceCraft:
         self.pos_cb = self.get_cb_pos()
         self.velocity = initial_v
         self.velocity_cb = self.get_cb_vel()
+        self.system_bodies = system_bodies
 
     def update(self, pos, t, v, system_bodies):
         self.pos = pos
@@ -24,8 +25,7 @@ class SpaceCraft:
         self.velocity = v
         self.velocity_cb = self.get_cb_vel()
 
-    @staticmethod
-    def calculate_trajectory(position, time, velocity, expected_endtime, expected_endpos, system_bodies):
+    def calculate_trajectory(self, expected_endtime, expected_endpos, system_bodies):
         """
         Calls ode.driver to integrate path until nearest expected_endpos.
         """
@@ -33,16 +33,16 @@ class SpaceCraft:
         def ode_equations(_t, _r):
             return ode.equations(_t, _r, system_bodies)
 
-        initial_y = np.append(position, velocity)
-        ys, ts = ode.driver(ode_equations, time, initial_y, expected_endtime, expected_endpos, h=0.1, acc=1e-3,
+        initial_y = np.append(self.pos, self.velocity)
+        ys, ts = ode.driver(ode_equations, self.t, initial_y, expected_endtime, expected_endpos, h=0.1, acc=1e-3,
                             eps=1e-3, stepper=ode.rk45_step, limit=2000, max_factor=2)
         return ts, ys
 
-    @staticmethod
-    def circular_speed(body, relative_pos):
+    def circular_speed(self, body):
         """
         Estimates speed around indicated body if SpaceCraft is in circular orbit around it.
         """
+        relative_pos = self.pos - body.get_barycentric(self.t)
         distance = la.norm(relative_pos, axis=0)
         speed = np.sqrt(cnst.G * body.mass / distance)
         return speed
