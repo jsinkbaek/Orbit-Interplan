@@ -9,7 +9,7 @@ class SpaceCraft:
     """
     Class of object called SpaceCraft. Used for the spacecraft that we wish to do trajectory planning on.
     """
-    def __init__(self, initial_pos, initial_t, initial_v, system_bodies):
+    def __init__(self, initial_pos, initial_t, initial_v, system_bodies, unit_converter):
         self.pos = initial_pos
         self.t = initial_t
         self.current_body = self.get_current_body(system_bodies)
@@ -17,6 +17,7 @@ class SpaceCraft:
         self.velocity = initial_v
         self.velocity_cb = self.get_cb_vel()
         self.system_bodies = system_bodies
+        self.unitc = unit_converter
 
     def update(self, pos, t, v, system_bodies=None):
         if system_bodies is None:
@@ -56,9 +57,10 @@ class SpaceCraft:
         if body is None:
             body = self.get_current_body()
         relative_pos = self.pos - body.get_barycentric(self.t)
-        distance = la.norm(relative_pos, axis=0)
-        speed = np.sqrt(cnst.G * body.mass / distance)
-        return speed
+        distance = la.norm(relative_pos, axis=0) * self.unitc.d
+        mass = body.mass * body.unitc.m
+        speed = np.sqrt(cnst.G * mass / distance)
+        return speed * 1/self.unitc.v
 
     def get_current_body(self, system_bodies=None):
         """

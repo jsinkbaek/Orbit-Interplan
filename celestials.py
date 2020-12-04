@@ -19,19 +19,29 @@ class CelestialBody:
         self.a = a           # semi-major axis in m
         self.unitc = unit_converter
 
-    def get_barycentric(self, t, t0=2451545., tformat='jd'):
+    def get_barycentric(self, t, t0=None, tformat=None):
+        if tformat is None:
+            tformat = self.unitc.tname
+        if tformat == 'jd' and t0 is None:
+            t0 = 2451545        # jan 1 2000 in jd
         t_ = Time(t+t0, format=tformat)
-        pos = get_body_barycentric(self.name, t_).xyz.to('m').to_value()      # cartesian representation in m
+        pos = get_body_barycentric(self.name, t_).xyz.to(self.unitc.dname).to_value()  # cartesian representation
         return pos
 
-    def get_barycentric_vel(self, t, t0=2451545, tformat='jd'):
+    def get_barycentric_vel(self, t, t0=None, tformat=None):
+        if tformat is None:
+            tformat = self.unitc.tname
+        if tformat == 'jd' and t0 is None:
+            t0 = 2451545        # jan 1 2000 in jd
         t_ = Time(t + t0, format=tformat)
-        vel = get_body_barycentric_posvel(self.name, t_)[1].xyz.to('m/d').to_value()
+        vel = get_body_barycentric_posvel(self.name, t_)[1].xyz.to(self.unitc.vname).to_value()
         return vel
 
     def sphere_of_influence(self):
         if self.parent is not None:
-            r_soi = self.a * (self.mass / self.parent.mass) ** (2/5)
+            mass = self.mass * self.unitc.m
+            pmass = self.parent.mass * self.parent.unitc.m
+            r_soi = self.a * (mass / pmass) ** (2/5)
             return r_soi
         else:
             raise AttributeError('sphere_of_influence. body of name ', self.name, ' has no parent')
@@ -57,8 +67,13 @@ class CelestialGroup:
             self.parents = np.append(self.parents, arg.parent)
             self.kinds = np.append(self.kinds, arg.kind)
         self.n = len(self.names)
+        self.unitc = self.objects[0].unitc
 
-    def ephemeris(self, t, t0=2451545, tformat='jd'):
+    def ephemeris(self, t, t0=None, tformat=None):
+        if tformat is None:
+            tformat = self.unitc.tname
+        if tformat == 'jd' and t0 is None:
+            t0 = 2451545        # jan 1 2000 in jd
         pos = np.empty((3, self.n))
         for i in range(0, self.n):
             pos[:, i] = self.objects[i].get_barycentric(t, t0, tformat)

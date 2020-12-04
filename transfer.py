@@ -17,10 +17,13 @@ class Hohmann:
             body = self.spacecraft.get_current_body(self.spacecraft.system_bodies)
         if r2 is None:
             r2 = la.norm(body.get_barycentric(self.spacecraft.t), axis=0)
-        dv1 = np.sqrt(cnst.G * body.mass / r1) * (np.sqrt(2.*r2/(r1+r2)) - 1)
-        dv2 = np.sqrt(cnst.G * body.mass / r2) * (1 - np.sqrt(2*r1/(r1+r2)))
+        r1 = r1 * self.spacecraft.unitc.d
+        r2 = r2 * self.spacecraft.unitc.d
+        mass = body.mass * self.spacecraft.unitc.m
+        dv1 = np.sqrt(cnst.G * mass / r1) * (np.sqrt(2.*r2/(r1+r2)) - 1) * 1/self.spacecraft.unitc.v
+        dv2 = np.sqrt(cnst.G * mass / r2) * (1 - np.sqrt(2*r1/(r1+r2))) * 1/self.spacecraft.unitc.v
         dv = dv1 + dv2
-        tH = np.pi * np.sqrt((r1+r2)**3 / (8*cnst.G*body.mass))
+        tH = np.pi * np.sqrt((r1+r2)**3 / (8*cnst.G*mass)) * 1/self.spacecraft.unitc.t
         return dv, dv1, dv2, tH
 
     def angular_alignment(self, target, parent, r1=None):
@@ -31,11 +34,14 @@ class Hohmann:
         if r1 is None:
             r1 = la.norm(self.spacecraft.pos, axis=0)
         r2 = la.norm(target.get_barycentric(self.spacecraft.t), axis=0)
-        target_angvel = np.sqrt(cnst.G * parent.mass / r2**3)
-        tH = np.pi * np.sqrt((r1+r2)**3 / (8*cnst.G*parent.mass))
+        r1 = r1 * self.spacecraft.unitc.d
+        r2 = r2 * self.spacecraft.unitc.d
+        pmass = parent.mass * parent.unitc.m
+        target_angvel = np.sqrt(cnst.G * pmass / r2**3)
+        tH = np.pi * np.sqrt((r1+r2)**3 / (8*cnst.G*pmass))
         # Angular alignment alpha in radians
         alpha = np.pi - target_angvel * tH
-        return alpha, tH
+        return alpha, tH * 1/target.unitc.t
 
 
 class Rendezvous:
