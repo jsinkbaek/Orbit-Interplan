@@ -3,7 +3,7 @@ from celestials import CelestialBody, CelestialGroup
 import numpy as np
 import numpy.linalg as la
 from scipy import constants as cnst
-from scipy.optimize import minimize
+from scipy.optimize import minimize, minimize_scalar
 
 
 class Hohmann:
@@ -72,14 +72,16 @@ class Rendezvous:
         # angle_ini = self.relative_angle_xy(t_ini)
         # alpha_angle = self.hohmann.angular_alignment(self.target, self.parent)
         if timebound is None:
-            sma_target = la.norm(self.target.get_barycentric(t_ini), axis=0)
+            sma_target = la.norm(self.target.get_barycentric(t_ini), axis=0) * self.target.unitc.d
             # Upper timelimit is then 2 orbits of target
-            timebound = t_ini + 2 * 2*np.pi*np.sqrt(sma_target**3 / cnst.G*self.parent.mass)
-
+            timebound = 2 * 2*np.pi*np.sqrt(sma_target**3 / (cnst.G*self.parent.mass * self.parent.unitc.m))
+            timebound = timebound * 1/self.target.unitc.t + t_ini
+        print('tmb', timebound)
         def minimize_func(t_):
-            return np.abs(self.relative_angle_xy(t_) - self.hohmann.angular_alignment(self.target, self.parent))
+            ang_align, _ = self.hohmann.angular_alignment(self.target, self.parent)
+            return np.abs(self.relative_angle_xy(t_) - ang_align)
 
-        optimize_res = minimize(minimize_func, t_ini, bounds=(t_ini, t_ini+timebound))
+        optimize_res = minimize_scalar(minimize_func, t_ini, bounds=(t_ini, timebound), method='Bounded')
         t_first = np.min(optimize_res.values())
         return t_first, optimize_res.values()
 
