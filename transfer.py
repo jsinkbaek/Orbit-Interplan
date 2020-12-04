@@ -16,8 +16,8 @@ class Hohmann:
         if body is None:
             body = self.spacecraft.get_current_body(self.spacecraft.system_bodies)
         if r2 is None:
-            la.norm(body.get_barycentric(self.spacecraft.t), axis=0)
-        dv1 = np.sqrt(cnst.G * body.mass / r1) * (np.sqrt(2*r2/(r1+r2)) - 1)
+            r2 = la.norm(body.get_barycentric(self.spacecraft.t), axis=0)
+        dv1 = np.sqrt(cnst.G * body.mass / r1) * (np.sqrt(2.*r2/(r1+r2)) - 1)
         dv2 = np.sqrt(cnst.G * body.mass / r2) * (1 - np.sqrt(2*r1/(r1+r2)))
         dv = dv1 + dv2
         tH = np.pi * np.sqrt((r1+r2)**3 / (8*cnst.G*body.mass))

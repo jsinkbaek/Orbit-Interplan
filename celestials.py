@@ -11,12 +11,13 @@ class CelestialBody:
     """
     solar_system_ephemeris.set('de432s')
 
-    def __init__(self, name, mass, kind, parent, a):
+    def __init__(self, name, mass, kind, parent, a, unit_converter):
         self.name = name
         self.mass = mass
         self.kind = kind
         self.parent = parent
-        self.a = a * 1.496 * 1e11           # semi-major axis in km
+        self.a = a           # semi-major axis in m
+        self.unitc = unit_converter
 
     def get_barycentric(self, t, t0=2451545., tformat='jd'):
         t_ = Time(t+t0, format=tformat)
@@ -25,7 +26,7 @@ class CelestialBody:
 
     def get_barycentric_vel(self, t, t0=2451545, tformat='jd'):
         t_ = Time(t + t0, format=tformat)
-        vel = get_body_barycentric_posvel(self.name, t_)[1].xyz.to('m/s').to_value()
+        vel = get_body_barycentric_posvel(self.name, t_)[1].xyz.to('m/d').to_value()
         return vel
 
     def sphere_of_influence(self):

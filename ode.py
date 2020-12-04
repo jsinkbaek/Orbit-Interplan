@@ -14,10 +14,13 @@ def equations(t, r, objects):
                     of current position of all planetoids needed, in solar cartesian coordinates.
     :return: vector dr with dx,dy,dz,ddx,ddy,ddz
     """
+    # print('t', t)
+    # print('r', r)
     dr = np.empty(r.shape)
-    dr[0:3] = r[3:6]
-    obj_pos = objects.ephemeris(t)
+    dr[0:3] = r[3:]
 
+    obj_pos = objects.ephemeris(t)
+    # print('obj_pos', obj_pos)
     positions = np.empty((3, obj_pos[0, :].size+1))
     positions[:, 0] = r[0:3]
     positions[:, 1:] = obj_pos
@@ -33,13 +36,14 @@ def acceleration(positions, mass):
     :param mass: masses of objects. mass[0] is sun, then other objects. numpy 2d array size (1, nobjects)
     :return: returns resulting acceleration a at point r[:, 0]. Should be ndarray with size (3, 1)
     """
-    rij = positions[:, 1:] - positions[:, 0].reshape((len(positions[:, 0]), 1))
+    rij = positions[:, 1:len(positions[0, :])] - positions[:, 0].reshape((len(positions[:, 0]), 1))
     distance = la.norm(rij, axis=0)  # distance[0] is distance to sun
-    a = cnst.G * np.sum(5.9722 * 1e24 * mass * rij / (distance**3), axis=1)  # factor us earth mass to kg
+    a = cnst.G * np.sum(mass * rij / (distance**3), axis=1) * 86400**2  # factor earth mass to kg
     return a
 
 
-def driver(f, a, ya, b, yb, h, acc, eps, stepper, limit, max_factor, estimate_endpos=True, max_stepsize=None):
+def driver(f, a, ya, b, yb, stepper, h=0.1, acc=1e-6, eps=1e-6, limit=1000, max_factor=2, estimate_endpos=True,
+           max_stepsize=None):
     """
     Adaptive ode driver that advances solution by calling rkXX stepper and adjusts to appropriate step sizes.
     Stops at closest approach to a wanted position yb.
@@ -61,7 +65,7 @@ def driver(f, a, ya, b, yb, h, acc, eps, stepper, limit, max_factor, estimate_en
     is fixed to ya length of 6 (3 cartesian coordinates, 3 cartesian velocities) due to while loop conditions
     """
     nsteps = 0
-    r = np.empty(shape=(6, limit), dtype=np.double)
+    r = np.empty(shape=(len(ya), limit), dtype=np.double)
     t = np.empty(shape=(limit,), dtype=np.double)
     r[:] = np.NaN
     t[:] = np.NaN
@@ -90,7 +94,7 @@ def driver(f, a, ya, b, yb, h, acc, eps, stepper, limit, max_factor, estimate_en
         accept = True
         tol_ratio = np.ones(err.size)
         for i in range(0, tau.size):
-            tol_ratio[i] = np.abs(tau[i]/err[i])
+            tol_ratio[i] = np.abs(tau[i])/np.abs(err[i])
             if tol_ratio[i] < 1:
                 accept = False
 
@@ -106,9 +110,10 @@ def driver(f, a, ya, b, yb, h, acc, eps, stepper, limit, max_factor, estimate_en
             print("Bad step at x = ", x)
             print("Step rejected")
         # Adjust stepsize based on empirical formula
-        tol_min = tol_ratio[0]
-        for i in range(1, tol_ratio.size):
-            tol_min = np.min([tol_min, tol_ratio[i]])
+        tol_min = np.min(tol_ratio)
+        # tol_min = tol_ratio[0]
+        # for i in range(1, tol_ratio.size):
+        #     tol_min = np.min([tol_min, tol_ratio[i]])
         adj_factor = np.power(tol_min, 0.25)*0.95
         if adj_factor > max_factor:
             adj_factor = max_factor
@@ -123,8 +128,8 @@ def driver(f, a, ya, b, yb, h, acc, eps, stepper, limit, max_factor, estimate_en
             condition = la.norm(yx[0:2] - yb, axis=0) < la.norm(yx0[0:2] - yb, axis=0)
         else:
             condition = x < b
-    t = np.where(np.isfinite(t), t, 0)
-    r = np.where(np.isfinite(r), r, 0)
+    t = t[~np.isnan(t)]
+    r = r[:, ~np.all(np.isnan(r), axis=0)]
     print("ODE solved in ", nsteps, " steps")
     return r, t
 
@@ -143,7 +148,7 @@ def rk45_step(f, t, yt, h):
     k[:, 0] = h * f(t, yt)
     k[:, 1] = h * f(t+h*1.0/4, yt+k[:, 0]*1.0/4)
     k[:, 2] = h * f(t+h*3.0/8, yt+k[:, 0]*3.0/32+k[:, 1]*9.0/32)
-    k[:, 3] = h * f(t+h*12.0/13, yt+k[:, 0]*1932.0/2197-k[:, 1]*7200.0/2197*+k[:, 2]*7296.0/2197)
+    k[:, 3] = h * f(t+h*12.0/13, yt+k[:, 0]*1932.0/2197-k[:, 1]*7200.0/2197+k[:, 2]*7296.0/2197)
     k[:, 4] = h * f(t+h*1.0, yt+k[:, 0]*439.0/216-k[:, 1]*8.0+k[:, 2]*3680.0/513-k[:, 3]*845.0/4104)
     k[:, 5] = h * f(t+h*0.5, yt-k[:, 0]*8.0/27+k[:, 1]*2.0-k[:, 2]*3544.0/2565+k[:, 3]*1859.0/4104-k[:, 4]*11.0/40)
     b5 = np.array([16.0/135, 0, 6656.0/12825, 28561.0/56430, -9.0/50, 2.0/55])
