@@ -29,7 +29,7 @@ moon = CelestialBody('moon', 0.0123000371, 'moon', earth, 0.002572*a_factor, uni
 solar_system = CelestialGroup(sun, earth, moon, mars, jupiter)
 # solar_system = CelestialGroup(sun, mercury, venus, earth, mars, jupiter, saturn, uranus, neptune, moon)
 
-distance = 150000   # km to AU
+distance = 15000   # km
 t_jd = np.double(800)
 v_circ = np.sqrt(cnst.G * earth.mass*earth.unitc.m / (distance*earth.unitc.d)) * 1/earth.unitc.v
 satellite_pos = earth.get_barycentric(t_jd) + np.array([distance, 0, 0])
@@ -42,13 +42,13 @@ dv_earthescape = v_esc - v_circ
 billy.update(billy.pos, billy.t, billy.velocity + np.array([0, -dv_earthescape, 0]))
 hohmann1 = transfer.Hohmann(billy)
 dvh1, dvh1_1, dvh1_2, tH1 = hohmann1.simple(r2=jupiter.a, body=sun)
-print(hohmann1.angular_alignment(jupiter, jupiter.parent))
+print('hoh1 ang_align jup ', hohmann1.angular_alignment(jupiter, jupiter.parent))
 
 
 jrendz = transfer.Rendezvous(billy, jupiter, sun)
-print(jrendz.relative_angle_xy(billy.t))
-print(jrendz.initialburn_simple())
-
+print('rendv rel anglexy ', jrendz.relative_angle_xy(billy.t))
+print('initalburn_simple ', jrendz.initialburn_simple())
+print('initialburn_interplan', jrendz.initialburn_interplan())
 """
 ts, ys = billy.calculate_trajectory(t_jd+dt)
 pos_res = ys[0:3, :]

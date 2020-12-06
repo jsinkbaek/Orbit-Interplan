@@ -66,7 +66,7 @@ class Rendezvous:
         """
         Approximates time for initial burn for interplanetary Hohmann transfer using relative angle in the xy-plane.
         (Only good for low inclinations of target and spacecraft).
-        Assumes spacecraft starts in circular orbit.
+        Assumes spacecraft starts in circular orbit around sun.
         """
         t_ini = self.spacecraft.t
         # angle_ini = self.relative_angle_xy(t_ini)
@@ -76,22 +76,50 @@ class Rendezvous:
             # Upper timelimit is then 2 orbits of target
             timebound = 2 * 2*np.pi*np.sqrt(sma_target**3 / (cnst.G*self.parent.mass * self.parent.unitc.m))
             timebound = timebound * 1/self.target.unitc.t + t_ini
-        print('tmb', timebound)
+
         def minimize_func(t_):
             ang_align, _ = self.hohmann.angular_alignment(self.target, self.parent)
             return np.abs(self.relative_angle_xy(t_) - ang_align)
 
         optimize_res = minimize_scalar(minimize_func, t_ini, bounds=(t_ini, timebound), method='Bounded')
-        t_first = np.min(optimize_res.values())
-        return t_first, optimize_res.values()
+        t_first = np.min(optimize_res.x)
+        print('t_first', t_first)
+        return t_first, optimize_res
+
+    def initialburn_interplan(self, timebound=None):
+        """
+        Assumes spacecraft starts in circular orbit around a planet. Tries to find optimal time for burn to utilize
+        current planet gravity.
+        """
+        t_simple, _ = self.initialburn_simple(timebound)
+
+        _, tH = self.hohmann.angular_alignment(self.target, self.parent)
+        target_pos = self.target.get_barycentric(t_simple+tH)             # location of target at approximate rendezvous
+
+        def minimize_func(t_):
+            rel_pos_cb = self.spacecraft.get_cb_pos()
+            rel_angle_cb = np.arctan(rel_pos_cb[1]/rel_pos_cb[0])
+            angle_target = np.arctan(target_pos[1]/target_pos[0])
+            return np.abs(angle_target - np.pi - rel_angle_cb)
+
+        rpos_cb = self.spacecraft.get_cb_pos()
+        rel_distance_cb = la.norm(rpos_cb, axis=0) * self.spacecraft.unitc.d
+        mu_cb = (cnst.G * self.spacecraft.get_current_body().mass * self.spacecraft.unitc.m)
+        tbound = 0.5 * 2 * np.pi * np.sqrt(rel_distance_cb**3 / mu_cb) * 1/self.spacecraft.unitc.t
+        optimize_res = minimize_scalar(minimize_func, t_simple, bounds=(t_simple-tbound, t_simple+tbound),
+                                       method='Bounded')
+        print('rpos', rpos_cb)
+        print('t_bound', tbound)
+        t_res = np.min(optimize_res.x)
+        return t_res, optimize_res
 
     def integrate_optimize(self, target_distance=1000, timebound=None):
-        t_initialburn, t_possible = self.initialburn_simple(timebound=timebound)
+        t_initialburn, t_possible = self.initialburn_interplan(timebound=timebound)
         ts_, ys_ = self.spacecraft.calculate_trajectory(expected_endtime=t_initialburn)
         t_begin = ts_[-1]
         pos_begin = ys_[0:2, -1]
         vel_begin = ys_[3:5, -1]
-        tempcraft = SpaceCraft(pos_begin, t_begin, vel_begin, self.spacecraft.system_bodies)
+        tempcraft = SpaceCraft(pos_begin, t_begin, vel_begin, self.spacecraft.system_bodies, self.spacecraft.unitc)
         thohmann_ = Hohmann(tempcraft)
         _, dv1h, dv2h, th = thohmann_.simple()
         v_unit = vel_begin/la.norm(vel_begin, axis=0)
