@@ -114,7 +114,6 @@ class Rendezvous:
         y_linspace = minimize_func(t_linspace)
         y_inverted = 1-y_linspace/(2*np.pi)
         peaks_idx = find_peaks(y_inverted)[0]
-        print('peaks', peaks_idx)
         plt.plot(t_linspace, 1-y_linspace/(2*np.pi), 'r.')
         plt.plot(t_linspace[peaks_idx], y_inverted[peaks_idx], 'b*')
         plt.show()
@@ -173,27 +172,31 @@ class Rendezvous:
         Assumes spacecraft starts in circular orbit around a planet. Tries to find optimal time for burn to utilize
         current planet gravity.
         """
-        t_simple, _ = self.initialburn_simple(timebound)
+        t_simple = self.initialburn_simple(timebound)
 
         _, tH = self.hohmann.angular_alignment(self.target, self.parent)
         target_pos = self.target.get_barycentric(t_simple+tH)             # location of target at approximate rendezvous
-
-        def minimize_func(t_):
-            rel_pos_cb = self.spacecraft.get_cb_pos()
-            rel_angle_cb = np.mod(np.arctan2(rel_pos_cb[1], rel_pos_cb[0]), 2*np.pi)
-            angle_target = np.mod(np.arctan2(target_pos[1], target_pos[0]), 2*np.pi)
-            return np.abs(angle_target - np.pi - rel_angle_cb)
-
         rpos_cb = self.spacecraft.get_cb_pos()
         rel_distance_cb = la.norm(rpos_cb, axis=0) * self.spacecraft.unitc.d
         mu_cb = (cnst.G * self.spacecraft.get_current_body().mass * self.spacecraft.unitc.m)
         tbound = 0.5 * 2 * np.pi * np.sqrt(rel_distance_cb**3 / mu_cb) * 1/self.spacecraft.unitc.t
-        optimize_res = minimize_scalar(minimize_func, t_simple, bounds=(t_simple-tbound, t_simple+tbound),
-                                       method='Bounded')
+        parentsystem = CelestialGroup(self.spacecraft.get_current_body())
+        testcraft = SpaceCraft(self.spacecraft.pos, self.spacecraft.t, self.spacecraft.velocity,
+                               parentsystem, self.spacecraft.unitc)
+        ts, ys = testcraft.calculate_trajectory(t_simple+tbound)
+        pos_traj = ys[0:3, :]
+        pos_rel = pos_traj - testcraft.get_current_body().get_barycentric(ts)
+        angle_rel_cb = np.mod(np.arctan2(pos_rel[1, :], pos_rel[0, :]), 2*np.pi)
+        angle_target = np.mod(np.arctan2(target_pos[1], target_pos[0]), 2*np.pi)
+        angle_match = np.abs(angle_target - np.pi - angle_rel_cb)
+        angle_match = 1 - angle_match/(2*np.pi)
+        plt.figure()
+        plt.plot(ts, angle_match)
+        plt.show()
+
         print('rpos', rpos_cb)
         print('t_bound', tbound)
-        t_res = np.min(optimize_res.x)
-        return t_res, optimize_res
+        return angle_match
 
     def integrate_optimize(self, target_distance=1000, timebound=None):
         t_initialburn, t_possible = self.initialburn_interplan(timebound=timebound)

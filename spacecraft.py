@@ -107,7 +107,6 @@ class SpaceCraft:
             vel = self.velocity
         relative_pos = pos - body.get_barycentric(t)
         relative_vel = vel - body.get_barycentric_vel(t)
-        
 
     def get_cb_pos(self):
         current_body_pos = self.current_body.get_barycentric(self.t)
