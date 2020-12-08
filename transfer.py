@@ -4,6 +4,7 @@ import numpy as np
 import numpy.linalg as la
 from scipy import constants as cnst
 from scipy.optimize import minimize, minimize_scalar
+import matplotlib.pyplot as plt
 
 
 class Hohmann:
@@ -54,6 +55,7 @@ class Rendezvous:
     def relative_angle_xy(self, t):
         """
         Finds xy relative angle between spacecraft and target. Most useful for orbits close to the xy-plane.
+        Not useful for finding initialburn, as spacecraft position is static (needs to be integrated)
         """
         pos_target = self.target.get_barycentric(t)
         y_target, x_target = pos_target[1], pos_target[0]
@@ -62,28 +64,73 @@ class Rendezvous:
         angle_scraft = np.arctan(y_scraft/x_scraft)
         return angle_target - angle_scraft
 
+    def relative_angle_planets(self, t, body1, body2):
+        """
+        Finds xy relative angle between two planets. Can be used to estimate relative angle between a target and space-
+        craft in case spacecraft is in orbit around the other body
+        """
+        pos_body1 = body1.get_barycentric(t)
+        pos_body2 = body2.get_barycentric(t)
+        angle_body1 = np.arctan(pos_body1[1]/pos_body1[0])
+        angle_body2 = np.arctan(pos_body2[1]/pos_body2[0])
+        return angle_body1 - angle_body2
+
     def initialburn_simple(self, timebound=None):
         """
         Approximates time for initial burn for interplanetary Hohmann transfer using relative angle in the xy-plane.
         (Only good for low inclinations of target and spacecraft).
-        Assumes spacecraft starts in circular orbit around sun.
+        Assumes spacecraft position can be approximated with a body (e.g. Earth) in circular orbit around sun.
         """
         t_ini = self.spacecraft.t
         # angle_ini = self.relative_angle_xy(t_ini)
         # alpha_angle = self.hohmann.angular_alignment(self.target, self.parent)
         if timebound is None:
-            sma_target = la.norm(self.target.get_barycentric(t_ini), axis=0) * self.target.unitc.d
-            # Upper timelimit is then 2 orbits of target
-            timebound = 2 * 2*np.pi*np.sqrt(sma_target**3 / (cnst.G*self.parent.mass * self.parent.unitc.m))
+            # sma_target = la.norm(self.target.get_barycentric(t_ini), axis=0) * self.target.unitc.d
+            sma_self = la.norm(self.spacecraft.pos) * self.target.unitc.d
+            # Upper timelimit is then 2 orbits of self
+            timebound = 2 * 2*np.pi*np.sqrt(sma_self**3 / (cnst.G*self.parent.mass * self.parent.unitc.m))
             timebound = timebound * 1/self.target.unitc.t + t_ini
 
         def minimize_func(t_):
             ang_align, _ = self.hohmann.angular_alignment(self.target, self.parent)
-            return np.abs(self.relative_angle_xy(t_) - ang_align)
+            body1 = self.target
+            body2 = self.spacecraft.get_current_body()
+            return np.abs(self.relative_angle_planets(t_, body1, body2) - ang_align)
 
         optimize_res = minimize_scalar(minimize_func, t_ini, bounds=(t_ini, timebound), method='Bounded')
         t_first = np.min(optimize_res.x)
+        plt.figure()
+        for i in range(0, 100):
+            body1 = self.target
+            body2 = self.spacecraft.get_current_body()
+            ang_align_, _ = self.hohmann.angular_alignment(self.target, self.parent)
+            t_test = t_ini + i/100 * (timebound-t_ini)
+            plt.plot(t_test, np.abs(self.relative_angle_planets(t_test, body1, body2) - ang_align_), 'r*')
+            plt.plot(t_test, self.relative_angle_planets(t_test, body1, body2), 'b*')
+            plt.plot(t_test, ang_align_, 'g*')
         print('t_first', t_first)
+        plt.show(block=False)
+        plt.figure()
+        for i in range(0, 100):
+            body1 = self.target
+            body2 = self.spacecraft.get_current_body()
+            t_test = t_ini + i / 100 * (timebound - t_ini)
+            pos1 = body1.get_barycentric(t_test)
+            pos2 = body2.get_barycentric(t_test)
+            if i == 0:
+                plt.plot(pos1[0], pos1[1], 'g.')
+                plt.plot(pos2[0], pos2[1], 'g.')
+            elif i == 99:
+                plt.plot(pos1[0], pos1[1], 'y.')
+                plt.plot(pos2[0], pos2[1], 'y.')
+            else:
+                plt.plot(pos1[0], pos1[1], 'r.')
+                plt.plot(pos2[0], pos2[1], 'b.')
+            if np.abs(t_test - 1267) <= 1/100*(timebound-t_ini):
+                print('oui')
+                plt.plot(pos1[0], pos1[1], 'r*')
+                plt.plot(pos2[0], pos2[1], 'b*')
+        plt.show(block=True)
         return t_first, optimize_res
 
     def initialburn_interplan(self, timebound=None):
