@@ -118,9 +118,9 @@ class Rendezvous:
         plt.plot(t_linspace[peaks_idx], y_inverted[peaks_idx], 'b*')
         plt.show()
         t_first = np.min(t_linspace[peaks_idx])
+        """
         plt.figure()
         len_i = 500
-        """
         for i in range(0, len_i):
             body1 = self.target
             body2 = self.spacecraft.get_current_body()
@@ -169,8 +169,8 @@ class Rendezvous:
 
     def initialburn_interplan(self, timebound=None):
         """
-        Assumes spacecraft starts in circular orbit around a planet. Tries to find optimal time for burn to utilize
-        current planet gravity.
+        Assumes spacecraft starts in circular orbit around a planet with z=0.
+        Tries to find optimal time for burn to utilize current planet gravity.
         """
         t_simple = self.initialburn_simple(timebound)
 
@@ -179,20 +179,45 @@ class Rendezvous:
         rpos_cb = self.spacecraft.get_cb_pos()
         rel_distance_cb = la.norm(rpos_cb, axis=0) * self.spacecraft.unitc.d
         mu_cb = (cnst.G * self.spacecraft.get_current_body().mass * self.spacecraft.unitc.m)
-        tbound = 0.5 * 2 * np.pi * np.sqrt(rel_distance_cb**3 / mu_cb) * 1/self.spacecraft.unitc.t
-        parentsystem = CelestialGroup(self.spacecraft.get_current_body())
-        testcraft = SpaceCraft(self.spacecraft.pos, self.spacecraft.t, self.spacecraft.velocity,
-                               parentsystem, self.spacecraft.unitc)
-        ts, ys = testcraft.calculate_trajectory(t_simple+tbound)
-        pos_traj = ys[0:3, :]
-        pos_rel = pos_traj - testcraft.get_current_body().get_barycentric(ts)
-        angle_rel_cb = np.mod(np.arctan2(pos_rel[1, :], pos_rel[0, :]), 2*np.pi)
+        tbound = np.pi * np.sqrt(rel_distance_cb**3 / mu_cb) * 1/self.spacecraft.unitc.t
+        period = 2 * tbound
+        a_sma = rel_distance_cb
+
+        def x_cosine_phasematch(x_, v_x, t_):
+            if v_x < 0:
+                shift = 0
+            else:
+                shift = np.pi
+            t0s = np.linspace(0, period/2, 5000)
+            phase_idx = np.argmin(np.abs(x_ - a_sma*np.cos(2*np.pi*(t_-t0s)/period + shift)))
+            return t0s[phase_idx], shift
+
+        t0_phase, pshift = x_cosine_phasematch(self.spacecraft.pos[0], self.spacecraft.velocity[0], self.spacecraft.t)
+        ts = np.linspace(t_simple-tbound, t_simple+tbound, 5000)
+        xt = a_sma * np.cos(2*np.pi*(ts - t0_phase)/period + pshift)
+        yt = a_sma * np.sin(2*np.pi*(ts - t0_phase)/period + pshift)
+
+        angle_rel_cb = np.mod(np.arctan2(xt, yt), 2*np.pi)
         angle_target = np.mod(np.arctan2(target_pos[1], target_pos[0]), 2*np.pi)
         angle_match = np.abs(angle_target - np.pi - angle_rel_cb)
         angle_match = 1 - angle_match/(2*np.pi)
+        peaks_idx = find_peaks(angle_match)[0]
+        min_idx = np.min(peaks_idx)
+        t_first = ts[min_idx]
         plt.figure()
-        plt.plot(ts, angle_match)
+        plt.plot(ts, angle_match, 'r.')
+        plt.plot(ts[peaks_idx], angle_match[peaks_idx], 'b*')
+        plt.plot(t_first, angle_match[min_idx], 'g*')
+        plt.show(block=False)
+
+        plt.figure()
+        cb_pos = self.spacecraft.get_current_body().get_barycentric(t_first)
+        plt.plot(cb_pos[0], cb_pos[1], 'b.')
+        target_pos_ = self.target.get_barycentric(t_first)
+        plt.plot(target_pos_[0], target_pos_[1], 'r.')
+        plt.plot(cb_pos[0]+xt[min_idx], cb_pos[1]+yt[min_idx], 'g.')
         plt.show()
+
 
         print('rpos', rpos_cb)
         print('t_bound', tbound)
