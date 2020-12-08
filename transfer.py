@@ -3,6 +3,7 @@ from celestials import CelestialBody, CelestialGroup
 import numpy as np
 import numpy.linalg as la
 from scipy import constants as cnst
+from scipy.signal import find_peaks
 from scipy.optimize import minimize, minimize_scalar
 import matplotlib.pyplot as plt
 
@@ -57,23 +58,35 @@ class Rendezvous:
         Finds xy relative angle between spacecraft and target. Most useful for orbits close to the xy-plane.
         Not useful for finding initialburn, as spacecraft position is static (needs to be integrated)
         """
-        pos_target = self.target.get_barycentric(t)
+        pos_target = self.target.get_barycentric(t)[0:2]
         y_target, x_target = pos_target[1], pos_target[0]
-        angle_target = np.arctan(y_target/x_target)
+        # angle_target = np.arctan(y_target/x_target)
+        angle_target = np.mod(np.arctan2(y_target, x_target), 2*np.pi)
         y_scraft, x_scraft = self.spacecraft.pos[1], self.spacecraft.pos[0]
-        angle_scraft = np.arctan(y_scraft/x_scraft)
+        # angle_scraft = np.arctan(y_scraft/x_scraft)
+        angle_scraft = np.mod(np.arctan2(y_scraft, x_scraft), 2*np.pi)
         return angle_target - angle_scraft
+        # if np.cross(self.spacecraft.pos[0:2], pos_target) < 0:
+        #    return angle_target - angle_scraft  # + np.pi
+        # else:
+        #    return angle_target - angle_scraft
 
     def relative_angle_planets(self, t, body1, body2):
         """
         Finds xy relative angle between two planets. Can be used to estimate relative angle between a target and space-
         craft in case spacecraft is in orbit around the other body
         """
-        pos_body1 = body1.get_barycentric(t)
-        pos_body2 = body2.get_barycentric(t)
-        angle_body1 = np.arctan(pos_body1[1]/pos_body1[0])
-        angle_body2 = np.arctan(pos_body2[1]/pos_body2[0])
+        pos_body1 = body1.get_barycentric(t)[0:2]
+        pos_body2 = body2.get_barycentric(t)[0:2]
+        # angle_body1 = np.arctan(pos_body1[1]/pos_body1[0])
+        # angle_body2 = np.arctan(pos_body2[1]/pos_body2[0])
+        angle_body1 = np.mod(np.arctan2(pos_body1[1], pos_body1[0]), 2*np.pi)
+        angle_body2 = np.mod(np.arctan2(pos_body2[1], pos_body2[0]), 2*np.pi)
         return angle_body1 - angle_body2
+        # if np.cross(pos_body2, pos_body1) < 0:
+        #    return angle_body1 - angle_body2
+        # else:
+        #    return angle_body1 - angle_body2
 
     def initialburn_simple(self, timebound=None):
         """
@@ -97,41 +110,63 @@ class Rendezvous:
             body2 = self.spacecraft.get_current_body()
             return np.abs(self.relative_angle_planets(t_, body1, body2) - ang_align)
 
-        optimize_res = minimize_scalar(minimize_func, t_ini, bounds=(t_ini, timebound), method='Bounded')
-        t_first = np.min(optimize_res.x)
+        t_linspace = np.linspace(t_ini, timebound, 10000)
+        y_linspace = minimize_func(t_linspace)
+        y_inverted = 1-y_linspace/(2*np.pi)
+        peaks_idx = find_peaks(y_inverted)[0]
+        print('peaks', peaks_idx)
+        plt.plot(t_linspace, 1-y_linspace/(2*np.pi), 'r.')
+        plt.plot(t_linspace[peaks_idx], y_inverted[peaks_idx], 'b*')
+        plt.show()
+        t_first = np.min(t_linspace[peaks_idx])
         plt.figure()
-        for i in range(0, 100):
+        len_i = 500
+        """
+        for i in range(0, len_i):
+            body1 = self.target
+            body2 = self.spacecraft.get_current_body()
+            t_test = t_ini + i / len_i * (timebound - t_ini)
+            pos_body1 = body1.get_barycentric(t_test)
+            pos_body2 = body2.get_barycentric(t_test)
+            angle_body1 = np.mod(np.arctan2(pos_body1[1], pos_body1[0]), 2*np.pi)
+            angle_body2 = np.mod(np.arctan2(pos_body2[1], pos_body2[0]), 2*np.pi)
+            plt.plot(t_test, angle_body1, 'r*')
+            plt.plot(t_test, angle_body2, 'b*')
+        plt.show(block=False)
+        plt.figure()
+        for i in range(0, len_i):
             body1 = self.target
             body2 = self.spacecraft.get_current_body()
             ang_align_, _ = self.hohmann.angular_alignment(self.target, self.parent)
-            t_test = t_ini + i/100 * (timebound-t_ini)
+            t_test = t_ini + i/len_i * (timebound-t_ini)
             plt.plot(t_test, np.abs(self.relative_angle_planets(t_test, body1, body2) - ang_align_), 'r*')
             plt.plot(t_test, self.relative_angle_planets(t_test, body1, body2), 'b*')
             plt.plot(t_test, ang_align_, 'g*')
         print('t_first', t_first)
         plt.show(block=False)
         plt.figure()
-        for i in range(0, 100):
+        for i in range(0, len_i):
             body1 = self.target
             body2 = self.spacecraft.get_current_body()
-            t_test = t_ini + i / 100 * (timebound - t_ini)
+            t_test = t_ini + i / len_i * (timebound - t_ini)
             pos1 = body1.get_barycentric(t_test)
             pos2 = body2.get_barycentric(t_test)
             if i == 0:
                 plt.plot(pos1[0], pos1[1], 'g.')
                 plt.plot(pos2[0], pos2[1], 'g.')
-            elif i == 99:
+            elif i == len_i-1:
                 plt.plot(pos1[0], pos1[1], 'y.')
                 plt.plot(pos2[0], pos2[1], 'y.')
             else:
                 plt.plot(pos1[0], pos1[1], 'r.')
                 plt.plot(pos2[0], pos2[1], 'b.')
-            if np.abs(t_test - 1267) <= 1/100*(timebound-t_ini):
-                print('oui')
-                plt.plot(pos1[0], pos1[1], 'r*')
-                plt.plot(pos2[0], pos2[1], 'b*')
+        firstpos_target = self.target.get_barycentric(t_first)
+        firstpos_scraft = self.spacecraft.get_current_body().get_barycentric(t_first)
+        plt.plot(firstpos_target[0], firstpos_target[1], 'r*', markersize=15)
+        plt.plot(firstpos_scraft[0], firstpos_scraft[1], 'b*', markersize=15)
         plt.show(block=True)
-        return t_first, optimize_res
+        """
+        return t_first
 
     def initialburn_interplan(self, timebound=None):
         """
@@ -145,8 +180,8 @@ class Rendezvous:
 
         def minimize_func(t_):
             rel_pos_cb = self.spacecraft.get_cb_pos()
-            rel_angle_cb = np.arctan(rel_pos_cb[1]/rel_pos_cb[0])
-            angle_target = np.arctan(target_pos[1]/target_pos[0])
+            rel_angle_cb = np.mod(np.arctan2(rel_pos_cb[1], rel_pos_cb[0]), 2*np.pi)
+            angle_target = np.mod(np.arctan2(target_pos[1], target_pos[0]), 2*np.pi)
             return np.abs(angle_target - np.pi - rel_angle_cb)
 
         rpos_cb = self.spacecraft.get_cb_pos()

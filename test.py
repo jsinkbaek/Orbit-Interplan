@@ -35,7 +35,7 @@ v_circ = np.sqrt(cnst.G * earth.mass*earth.unitc.m / (distance*earth.unitc.d)) *
 satellite_pos = earth.get_barycentric(t_jd) + np.array([distance, 0, 0])
 satellite_vel = earth.get_barycentric_vel(t_jd) + np.array([0, -v_circ, 0])
 billy = SpaceCraft(satellite_pos, t_jd, satellite_vel, solar_system, unitc)
-dt = 100
+dt = 800
 
 v_esc = np.sqrt(2*cnst.G*earth.mass/distance)
 dv_earthescape = v_esc - v_circ

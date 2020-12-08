@@ -98,6 +98,17 @@ class SpaceCraft:
             elif len(planets) > 1:
                 raise ValueError('get_current_body. Spacecraft within SOI of multiple planets')
 
+    def get_2body_pos(self, t_wanted, body, pos=None, t=None, vel=None):
+        if t is None:
+            t = self.t
+        if pos is None:
+            pos = self.pos
+        if vel is None:
+            vel = self.velocity
+        relative_pos = pos - body.get_barycentric(t)
+        relative_vel = vel - body.get_barycentric_vel(t)
+        
+
     def get_cb_pos(self):
         current_body_pos = self.current_body.get_barycentric(self.t)
         relative_pos = self.pos - current_body_pos
