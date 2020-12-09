@@ -45,7 +45,7 @@ class SpaceCraft:
             estimate_endpos = True
         initial_y = np.append(self.pos, self.velocity)
         ys, ts = ode.driver(ode_equations, self.t, initial_y, expected_endtime, expected_endpos, h=0.1, acc=1e-3,
-                            eps=1e-3, stepper=ode.rk45_step, limit=2000, max_factor=1.5,
+                            eps=1e-3, stepper=ode.rk45_step, limit=5000, max_factor=1.5,
                             estimate_endpos=estimate_endpos,
                             max_stepsize=max_stepsize)
         return ts, ys

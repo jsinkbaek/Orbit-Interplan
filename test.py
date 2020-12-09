@@ -26,11 +26,11 @@ neptune = CelestialBody('neptune', 17.204, 'planet', sun, 30.0699*a_factor, unit
 # Moons
 moon = CelestialBody('moon', 0.0123000371, 'moon', earth, 0.002572*a_factor, unitc)
 
-solar_system = CelestialGroup(sun, earth, moon, mars, jupiter)
+solar_system = CelestialGroup(sun, earth)
 # solar_system = CelestialGroup(sun, mercury, venus, earth, mars, jupiter, saturn, uranus, neptune, moon)
 
 distance = 15000   # km
-t_jd = np.double(800)
+t_jd = np.double(0)
 v_circ = np.sqrt(cnst.G * earth.mass*earth.unitc.m / (distance*earth.unitc.d)) * 1/earth.unitc.v
 satellite_pos = earth.get_barycentric(t_jd) + np.array([distance, 0, 0])
 satellite_vel = earth.get_barycentric_vel(t_jd) + np.array([0, -v_circ, 0])
@@ -49,6 +49,7 @@ jrendz = transfer.Rendezvous(billy, jupiter, sun)
 print('rendv rel anglexy ', jrendz.relative_angle_xy(billy.t))
 print('initalburn_simple ', jrendz.initialburn_simple())
 print('initialburn_interplan', jrendz.initialburn_interplan())
+print('integrate_optimize', jrendz.integrate_optimize())
 """
 ts, ys = billy.calculate_trajectory(t_jd+dt)
 pos_res = ys[0:3, :]

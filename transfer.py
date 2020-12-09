@@ -180,32 +180,39 @@ class Rendezvous:
         return t1
 
     def integrate_optimize(self, target_distance=1000, timebound=None):
-        t_initialburn, t_possible = self.initialburn_interplan(timebound=timebound)
+        t_initialburn = self.initialburn_interplan(timebound=timebound)
         ts_, ys_ = self.spacecraft.calculate_trajectory(expected_endtime=t_initialburn)
         t_begin = ts_[-1]
-        pos_begin = ys_[0:2, -1]
-        vel_begin = ys_[3:5, -1]
+        pos_begin = ys_[0:3, -1]
+        vel_begin = ys_[3:6, -1]
         tempcraft = SpaceCraft(pos_begin, t_begin, vel_begin, self.spacecraft.system_bodies, self.spacecraft.unitc)
         thohmann_ = Hohmann(tempcraft)
         _, dv1h, dv2h, th = thohmann_.simple()
         v_unit = vel_begin/la.norm(vel_begin, axis=0)
-        tempcraft.update(pos_begin, t_begin, vel_begin+v_unit*dv1h)
+        v_initialburn = v_unit*dv1h
         target_endpos = self.target.get_barycentric(th)
-        target_endpos[0] += target_distance
-
+        target_endpos[0] += target_distance     # TODO: make addition a vector instead of adding to x arbitrarily
+        # (e.g. opposite the initial position of the spacecraft if we want to hit the far side)
+        # TODO: make integrate_optimize so that it search for solutions by applying delta-v at different times in the
+        # current orbit, not just by shifting position and velocity around.
         # function to minimize, input 1D array (time, velocity, position), so (7, ) length
         def minimize_func(tvp):
+            tempcraft.update(tvp[4:7], tvp[0], tvp[1:4])
             ts_temp, ys_temp = tempcraft.calculate_trajectory(th, target_endpos)
             # Minimize difference from target_distance
-            endpos_temp = ys_temp[0:2, -1]
+            endpos_temp = ys_temp[0:3, -1]
             relative_distance = la.norm(endpos_temp - self.target.get_barycentric(ts_temp[-1]), axis=0)
             return np.abs(relative_distance - target_distance)
 
         tvp_initial = np.empty((7, ))
-        tvp_initial[0] = tempcraft.t
-        tvp_initial[1:3] = tempcraft.pos
-        tvp_initial[4:6] = tempcraft.velocity
-        optimize_res = minimize(minimize_func, tvp_initial)
+        tvp_initial[0] = t_begin
+        tvp_initial[1:4] = vel_begin + v_initialburn
+        tvp_initial[4:7] = pos_begin
+        cb_dist = la.norm(tempcraft.get_current_body().get_barycentric(t_begin))
+        cb_mu = tempcraft.get_current_body().mass*tempcraft.unitc.m * cnst.G
+        tbound = 0.25 * np.pi * np.sqrt(cb_dist**3 / cb_mu) * 1/tempcraft.unitc.t
+        bounds = ((t_begin-tbound, t_begin+tbound), (None, None))
+        optimize_res = minimize(minimize_func, tvp_initial, method='Bounded', bounds=)
         return optimize_res
 
 
