@@ -2,6 +2,8 @@ import numpy as np
 from celestials import CelestialBody
 import numpy.linalg as la
 from scipy import constants as cnst
+from scipy.integrate import solve_ivp
+import matplotlib.pyplot as plt
 import ode
 
 
@@ -28,7 +30,8 @@ class SpaceCraft:
         self.velocity = v
         self.velocity_cb = self.get_cb_vel()
 
-    def calculate_trajectory(self, expected_endtime, expected_endpos=None, system_bodies=None, max_stepsize=None):
+    def calculate_trajectory(self, expected_endtime, expected_endpos=None, system_bodies=None, max_stepsize=None,
+                             scipy=False):
         """
         Calls ode.driver to integrate path until nearest expected_endpos.
         """
@@ -44,10 +47,24 @@ class SpaceCraft:
         else:
             estimate_endpos = True
         initial_y = np.append(self.pos, self.velocity)
-        ys, ts = ode.driver(ode_equations, self.t, initial_y, expected_endtime, expected_endpos, h=0.1, acc=1e-3,
-                            eps=1e-3, stepper=ode.rk45_step, limit=5000, max_factor=1.5,
-                            estimate_endpos=estimate_endpos,
-                            max_stepsize=max_stepsize)
+        if scipy is True:
+            print()
+            print('self.t', self.t)
+            print('expc_t', expected_endtime)
+            ode_res = solve_ivp(ode_equations, (self.t, expected_endtime), initial_y, dense_output=False)
+            ys, ts = ode_res.y, ode_res.t
+            print('ys.shape', ys.shape)
+            print('ts.shape', ts.shape)
+
+        else:
+            ys, ts = ode.driver(ode_equations, self.t, initial_y, expected_endtime, expected_endpos, h=0.1, acc=1e-6,
+                                eps=1e-6, stepper=ode.rk45_step, limit=5000, max_factor=2,
+                                estimate_endpos=estimate_endpos,
+                                max_stepsize=max_stepsize)
+        plt.figure()
+        plt.plot(ys[0, :], ys[1, :])
+        plt.show()
+
         return ts, ys
 
     def circular_speed(self, body=None):

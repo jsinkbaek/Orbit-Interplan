@@ -29,40 +29,39 @@ moon = CelestialBody('moon', 0.0123000371, 'moon', earth, 0.002572*a_factor, uni
 solar_system = CelestialGroup(sun, earth)
 # solar_system = CelestialGroup(sun, mercury, venus, earth, mars, jupiter, saturn, uranus, neptune, moon)
 
-distance = 15000   # km
+distance = 150000   # km
 t_jd = np.double(0)
 v_circ = np.sqrt(cnst.G * earth.mass*earth.unitc.m / (distance*earth.unitc.d)) * 1/earth.unitc.v
 satellite_pos = earth.get_barycentric(t_jd) + np.array([distance, 0, 0])
 satellite_vel = earth.get_barycentric_vel(t_jd) + np.array([0, -v_circ, 0])
 billy = SpaceCraft(satellite_pos, t_jd, satellite_vel, solar_system, unitc)
-dt = 800
+dt = 550
 
-v_esc = np.sqrt(2*cnst.G*earth.mass/distance)
-dv_earthescape = v_esc - v_circ
-billy.update(billy.pos, billy.t, billy.velocity + np.array([0, -dv_earthescape, 0]))
 hohmann1 = transfer.Hohmann(billy)
 dvh1, dvh1_1, dvh1_2, tH1 = hohmann1.simple(r2=jupiter.a, body=sun)
-print('hoh1 ang_align jup ', hohmann1.angular_alignment(jupiter, jupiter.parent))
+# print('hoh1 ang_align jup ', hohmann1.angular_alignment(jupiter, jupiter.parent))
 
 
 jrendz = transfer.Rendezvous(billy, jupiter, sun)
-print('rendv rel anglexy ', jrendz.relative_angle_xy(billy.t))
-print('initalburn_simple ', jrendz.initialburn_simple())
-print('initialburn_interplan', jrendz.initialburn_interplan())
+# print('rendv rel anglexy ', jrendz.relative_angle_xy(billy.t))
+# print('initalburn_simple ', jrendz.initialburn_simple())
+# print('initialburn_interplan', jrendz.initialburn_interplan())
 print('integrate_optimize', jrendz.integrate_optimize())
-"""
-ts, ys = billy.calculate_trajectory(t_jd+dt)
-pos_res = ys[0:3, :]
-pos_rela = pos_res  # - earth.get_barycentric(ts)
-moon_rela = moon.get_barycentric(ts)  - earth.get_barycentric(ts)
-earth_pos = earth.get_barycentric(ts)
-sun_pos = sun.get_barycentric(ts)
+
+#ts, ys = billy.calculate_trajectory(t_jd+dt, legacy=True)
+#print('t_end', ts[-1])
+#pos_res = ys[0:3, :]
+#pos_rela = pos_res - earth.get_barycentric(ts)
+#moon_rela = moon.get_barycentric(ts) - earth.get_barycentric(ts)
+#earth_pos = earth.get_barycentric(ts)
+#sun_pos = sun.get_barycentric(ts)
 # plt.plot(moon_rela[0, :], moon_rela[1, :], 'k.')
 # plt.plot(earth_pos[0, :], earth_pos[1, :], 'b.')
 # plt.plot(sun_pos[0, :], sun_pos[1, :], 'y.')
-plt.plot(pos_rela[0, :], pos_rela[1, :], 'r*')
-plt.show()
-"""
+#plt.plot(pos_rela[0, :], pos_rela[1, :], 'r')
+#plt.plot(pos_rela[0, 0], pos_rela[1, 0], 'b*', markersize=20)
+#plt.show()
+
 
 """
 def eqsin(x, y):
