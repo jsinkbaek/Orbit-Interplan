@@ -7,6 +7,8 @@ from unitconverter import UnitConverter
 import matplotlib.pyplot as plt
 import ode
 import transfer
+import numpy.linalg as la
+
 # m_factor = 5.9722 * 1e24
 a_factor = 1.496 * 1e8      # AU to km
 unitc = UnitConverter(m_unit='m_earth', d_unit='km', t_unit='days', v_unit='km/d')
@@ -37,16 +39,38 @@ satellite_vel = earth.get_barycentric_vel(t_jd) + np.array([0, -v_circ, 0])
 billy = SpaceCraft(satellite_pos, t_jd, satellite_vel, solar_system, unitc)
 dt = 550
 
-hohmann1 = transfer.Hohmann(billy)
-dvh1, dvh1_1, dvh1_2, tH1 = hohmann1.simple(r2=jupiter.a, body=sun)
+hohmann1 = transfer.Hohmann(billy, jupiter)
+# dvh1, dvh1_1, dvh1_2, tH1 = hohmann1.simple(r2=jupiter.a, body=sun)
 # print('hoh1 ang_align jup ', hohmann1.angular_alignment(jupiter, jupiter.parent))
+earth_mu = earth.mass*earth.unitc.m * cnst.G
+orbital_period_rel_earth = 2*np.pi * np.sqrt(la.norm(distance*billy.unitc.d)**3 / earth_mu) / billy.unitc.t
 
+ts0, ys0 = billy.calculate_trajectory(265.2495138615002+0.5*orbital_period_rel_earth)
+v_unit = ys0[3:6, -1]/la.norm(ys0[3:6, -1], axis=0)
+print('norm', la.norm(v_unit))
+pos_rela_earth = ys0[0:3, -1] - earth.get_barycentric(ts0[-1])
+v_escape = np.sqrt(2*earth_mu/(la.norm(pos_rela_earth)*billy.unitc.d)) * 1/billy.unitc.v
+print('v_esc', v_escape)
+print('v_ini', la.norm(ys0[3:6, -1]))
+print('v_ini_rela_earth', la.norm(ys0[3:6, -1] - earth.get_barycentric_vel(ts0[-1])))
+v_initialburn = v_unit * 2*(hohmann1.dv1 + (v_escape - la.norm(ys0[3:6, -1]-earth.get_barycentric_vel(ts0[-1]))))
+ts, ys = hohmann1.integrate(ys0[0:3, -1], ys0[3:6, -1], v_initialburn, 265.2495138615002)
+jup_pos = jupiter.get_barycentric(ts)
+ear_pos = earth.get_barycentric(ts)
+plt.figure()
+plt.plot(ys[0, :], ys[1, :], 'k')
+plt.plot(jup_pos[0, :], jup_pos[1, :], 'r')
+plt.plot(ear_pos[0, :], ear_pos[1, :], 'b')
+plt.plot(ys0[0, -1], ys0[1, -1], 'm*', markersize=20)
+plt.plot(earth.get_barycentric(ts0[-1])[0], earth.get_barycentric(ts0[-1])[1], 'g*', markersize=20)
+
+plt.show()
 
 jrendz = transfer.Rendezvous(billy, jupiter, sun)
 # print('rendv rel anglexy ', jrendz.relative_angle_xy(billy.t))
 # print('initalburn_simple ', jrendz.initialburn_simple())
-# print('initialburn_interplan', jrendz.initialburn_interplan())
-print('integrate_optimize', jrendz.integrate_optimize())
+print('initialburn_interplan', jrendz.initialburn_interplan())
+# print('integrate_optimize', jrendz.integrate_optimize())
 
 #ts, ys = billy.calculate_trajectory(t_jd+dt, legacy=True)
 #print('t_end', ts[-1])

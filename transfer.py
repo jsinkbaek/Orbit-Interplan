@@ -10,8 +10,11 @@ import matplotlib.pyplot as plt
 
 
 class Hohmann:
-    def __init__(self, scraft):
+    def __init__(self, scraft, target):
         self.spacecraft = scraft
+        self.target = target
+        self.body = self.spacecraft.get_current_body()
+        self.dvtot, self.dv1, self.dv2, self.tH, self.r1, self.r2 = self.simple(body=self.target.parent)
 
     def simple(self, r1=None, r2=None, body=None):
         if r1 is None:
@@ -19,7 +22,7 @@ class Hohmann:
         if body is None:
             body = self.spacecraft.get_current_body(self.spacecraft.system_bodies)
         if r2 is None:
-            r2 = la.norm(body.get_barycentric(self.spacecraft.t), axis=0)
+            r2 = la.norm(self.target.get_barycentric(self.spacecraft.t), axis=0)
         r1 = r1 * self.spacecraft.unitc.d
         r2 = r2 * self.spacecraft.unitc.d
         mass = body.mass * self.spacecraft.unitc.m
@@ -27,7 +30,9 @@ class Hohmann:
         dv2 = np.sqrt(cnst.G * mass / r2) * (1 - np.sqrt(2*r1/(r1+r2))) * 1/self.spacecraft.unitc.v
         dv = dv1 + dv2
         tH = np.pi * np.sqrt((r1+r2)**3 / (8*cnst.G*mass)) * 1/self.spacecraft.unitc.t
-        return dv, dv1, dv2, tH
+        r1 = r1 / self.spacecraft.unitc.d
+        r2 = r2 / self.spacecraft.unitc.d
+        return dv, dv1, dv2, tH, r1, r2
 
     def angular_alignment(self, target, parent, r1=None):
         """
@@ -46,11 +51,18 @@ class Hohmann:
         alpha = np.pi - target_angvel * tH
         return alpha, tH * 1/target.unitc.t
 
+    def integrate(self, pos0, vel0, dv, t0, scraft=None, limit=5000):
+        if scraft is None:
+            scraft = self.spacecraft
+        scraft.update(pos0, t0, vel0+dv)
+        ts, ys = scraft.calculate_trajectory(t0+1.5*self.tH, limit=limit)
+        return ts, ys
+
 
 class Rendezvous:
     def __init__(self, scraft, target, parent):
         self.spacecraft = scraft
-        self.hohmann = Hohmann(scraft)
+        self.hohmann = Hohmann(scraft, target)
         self.target = target
         self.parent = parent        # parent of target (f.ex. Sun if target is Jupiter)
 
@@ -61,16 +73,10 @@ class Rendezvous:
         """
         pos_target = self.target.get_barycentric(t)[0:2]
         y_target, x_target = pos_target[1], pos_target[0]
-        # angle_target = np.arctan(y_target/x_target)
         angle_target = np.mod(np.arctan2(y_target, x_target), 2*np.pi)
         y_scraft, x_scraft = self.spacecraft.pos[1], self.spacecraft.pos[0]
-        # angle_scraft = np.arctan(y_scraft/x_scraft)
         angle_scraft = np.mod(np.arctan2(y_scraft, x_scraft), 2*np.pi)
         return angle_target - angle_scraft
-        # if np.cross(self.spacecraft.pos[0:2], pos_target) < 0:
-        #    return angle_target - angle_scraft  # + np.pi
-        # else:
-        #    return angle_target - angle_scraft
 
     def relative_angle_planets(self, t, body1, body2):
         """
@@ -190,7 +196,6 @@ class Rendezvous:
         print('1')
         ts_, ys_ = self.spacecraft.calculate_trajectory(expected_endtime=t_initialburn)
         # Initialize temporary spacecraft copy to work with instead of primary one
-        print('ts_', ts_)
         t_begin = ts_[-1]
         pos_begin = ys_[0:3, -1]
         vel_begin = ys_[3:6, -1]
@@ -209,8 +214,8 @@ class Rendezvous:
         f_interp = interp1d(ts_, ys_, kind='cubic')
 
         # Estimate initial delta-v using simple Hohmann transfer equations and escape velocity of current_body
-        thohmann_ = Hohmann(tempcraft)
-        _, dv1h, dv2h, th = thohmann_.simple()
+        thohmann_ = Hohmann(tempcraft, self.target)
+        _, dv1h, dv2h, th, _, _ = thohmann_.simple(body=self.parent)
         v_unit = vel_begin/la.norm(vel_begin, axis=0)
         cb_mu = tempcraft.get_current_body().mass*tempcraft.unitc.m * cnst.G
         v_escape = np.sqrt(2*cb_mu/la.norm(pos_begin))

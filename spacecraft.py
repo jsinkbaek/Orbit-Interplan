@@ -30,8 +30,8 @@ class SpaceCraft:
         self.velocity = v
         self.velocity_cb = self.get_cb_vel()
 
-    def calculate_trajectory(self, expected_endtime, expected_endpos=None, system_bodies=None, max_stepsize=None,
-                             scipy=False):
+    def calculate_trajectory(self, expected_endtime, expected_endpos=None, system_bodies=None, max_stepsize=0.01,
+                             scipy=False, limit=5000):
         """
         Calls ode.driver to integrate path until nearest expected_endpos.
         """
@@ -58,12 +58,12 @@ class SpaceCraft:
 
         else:
             ys, ts = ode.driver(ode_equations, self.t, initial_y, expected_endtime, expected_endpos, h=0.1, acc=1e-6,
-                                eps=1e-6, stepper=ode.rk45_step, limit=5000, max_factor=2,
+                                eps=1e-6, stepper=ode.rk45_step, limit=limit, max_factor=2,
                                 estimate_endpos=estimate_endpos,
                                 max_stepsize=max_stepsize)
-        plt.figure()
-        plt.plot(ys[0, :], ys[1, :])
-        plt.show()
+        # plt.figure()
+        # plt.plot(ys[0, :], ys[1, :])
+        # plt.show()
 
         return ts, ys
 

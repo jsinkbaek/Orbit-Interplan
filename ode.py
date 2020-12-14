@@ -41,7 +41,7 @@ def acceleration(positions, mass, unitc):
     return a * unitc.t**2 * 1/unitc.d
 
 
-def driver(f, a, ya, b, yb, stepper, h=0.1, acc=1e-6, eps=1e-6, limit=1000, max_factor=2, estimate_endpos=True,
+def driver(f, a, ya, b, yb, stepper, h=0.0001, acc=1e-9, eps=1e-9, limit=1000, max_factor=2, estimate_endpos=True,
            max_stepsize=None):
     """
     Adaptive ode driver that advances solution by calling rkXX stepper and adjusts to appropriate step sizes.

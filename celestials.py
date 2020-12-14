@@ -9,7 +9,7 @@ class CelestialBody:
     Class of objects called CelestialBody. Used to define celestial bodies necessary to calculate trajectory of
     spacecraft.
     """
-    solar_system_ephemeris.set('de432s')
+    solar_system_ephemeris.set('de430')
 
     def __init__(self, name, mass, kind, parent, a, unit_converter):
         self.name = name
