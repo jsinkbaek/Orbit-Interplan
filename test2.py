@@ -98,7 +98,7 @@ print('t_0', t_0)
 print('t1', t1)
 
 # # Try for rendezvous, integrate and update # #
-ts, ys = scraft.calculate_trajectory(264.07767720773387)
+ts, ys = scraft.calculate_trajectory(t1)
 scraft.update(ys[0:3, -1], ts[-1], ys[3:6, -1])
 
 # # Integrate Hohmann Transfer # #

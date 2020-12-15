@@ -183,17 +183,15 @@ class Rendezvous:
                 sun_pos = self.target.parent.get_barycentric(t_first)
                 plt.plot(sun_pos[0], sun_pos[1], 'y.')
                 plt.show(block=False)
-            print('t1', t_first)
             return t_first
         t1 = find_tfirst(t_simple)
-        t1 = find_tfirst(t1)
+        # t1 = find_tfirst(t1)
         return t1
 
-    def integrate_optimize(self, target_distance=1000, timebound=None):
+    def integrate_optimize(self, target_distance=0.1, timebound=None):
         # Calculate timestamp for estimated initial delta-v
         t_initialburn = self.initialburn_interplan(timebound=timebound)
         # Integrate until initial delta-v
-        print('1')
         ts_, ys_ = self.spacecraft.calculate_trajectory(expected_endtime=t_initialburn)
         # Initialize temporary spacecraft copy to work with instead of primary one
         t_begin = ts_[-1]
@@ -202,9 +200,7 @@ class Rendezvous:
         tempcraft = SpaceCraft(pos_begin, t_begin, vel_begin, self.spacecraft.system_bodies, self.spacecraft.unitc)
 
         # Integrate forward in orbit to have additional data points to use
-        print('2')
         ts_2, ys_2 = tempcraft.calculate_trajectory(expected_endtime=(t_begin + (t_begin-ts_[0])))
-        print(ts_2.shape)
         ts_ = np.append(ts_, ts_2)
         ys_ = np.append(ys_, ys_2, axis=1)
         ts_, u_idx = np.unique(ts_, return_index=True)
@@ -228,11 +224,30 @@ class Rendezvous:
             pos_, vel_ = y_interp[0:3], y_interp[3:]
             tempcraft.update(pos_, t_, vel_+dv_)
             ts_temp, ys_temp = tempcraft.calculate_trajectory(th*1.5)
-            # Minimize difference from target_distance
-            print(ys_temp.shape)
-            distance = la.norm(ys_temp[0:3, :] - self.target.get_barycentric(ts_temp), axis=0)
+            # # Minimize difference from target_distance # #
+            target_pos = self.target.get_barycentric(ts_temp)
+            parent_pos = self.target.parent.get_barycentric(ts_temp)
+            cb_pos = tempcraft.get_current_body().get_barycentric(ts_temp)
+            distance = la.norm(ys_temp[0:3, :] - target_pos, axis=0)
             min_dist_idx = np.argmin(distance)
             min_dist = distance[min_dist_idx]
+
+            # # Print and Plot # #
+            print('diff ', np.abs(min_dist - target_distance))
+            print('dv', la.norm(dv_))
+            plt.clf()
+            plt.xlim([-6.5, 6.5])
+            plt.ylim([-6.5, 6.5])
+            plt.plot(target_pos[0, :], target_pos[1, :], 'r')
+            plt.plot(parent_pos[0, :], parent_pos[0, :], 'y')
+            plt.plot(cb_pos[0, :], cb_pos[1, :], 'b')
+            plt.plot(parent_pos[0, min_dist_idx], parent_pos[1, min_dist_idx], 'y.', markersize=20)
+            plt.plot(target_pos[0, min_dist_idx], target_pos[1, min_dist_idx], 'r.', markersize=14)
+            plt.plot(cb_pos[0, min_dist_idx], cb_pos[1, min_dist_idx], 'b.', markersize=8)
+            plt.plot(ys_temp[0, :], ys_temp[1, :], 'k')
+            plt.plot(ys_temp[0, min_dist_idx], ys_temp[1, min_dist_idx], 'k.', markersize=8)
+            plt.draw()
+            plt.pause(0.0001)
             return np.abs(min_dist - target_distance)
 
         # Constraints on minimizer
@@ -242,7 +257,8 @@ class Rendezvous:
             speed = la.norm(vel_ + t_dv[1:])
             # Sun escape velocity
             mu_sun = self.target.parent.mass * self.target.unitc.m * cnst.G
-            v_esc = np.sqrt(2*mu_sun/(tempcraft.pos * tempcraft.unitc.d)) * 1/tempcraft.unitc.v
+            v_esc = np.sqrt(2*mu_sun/(la.norm(tempcraft.pos * tempcraft.unitc.d))) * 1/tempcraft.unitc.v
+            print('v_esc ', v_esc)
             return v_esc - speed
 
         def con2(t_dv):
@@ -252,7 +268,8 @@ class Rendezvous:
             return la.norm(vel_new) - la.norm(vel_)
 
         constraints = [{'type': 'ineq', 'fun': con1},
-                       {'type': 'ineq', 'fun': con2}]
+                       {'type': 'ineq', 'fun': con2}
+                       ]
 
         # Initial values and boundaries
         t_dv_initial = np.empty((4, ))
@@ -260,11 +277,18 @@ class Rendezvous:
         t_dv_initial[1:4] = vel_begin + v_initialburn
         cb_dist = la.norm(tempcraft.get_current_body().get_barycentric(t_begin)) * tempcraft.unitc.d
         tbound = 0.25 * np.pi * np.sqrt(cb_dist**3 / cb_mu) * 1/tempcraft.unitc.t
-        bounds = ((ts_[0], ts_[-1]), (None, None), (None, None), (None, None))
+        parent_mu = self.target.parent.mass * self.target.unitc.m * cnst.G
+        v_escape_sun = np.sqrt(2 * parent_mu/(la.norm(pos_begin * tempcraft.unitc.d))) * 1/tempcraft.unitc.v
+        bounds = ((ts_[0], ts_[-1]), (-v_escape_sun, v_escape_sun), (-v_escape_sun, v_escape_sun),
+                  (-v_escape_sun, v_escape_sun))
 
         # Call minimizer
-        optimize_res = minimize(minimize_func, t_dv_initial, method='Powell', bounds=bounds,
-                                constraints=constraints)
+        plt.figure()
+        optimize_res = minimize(minimize_func, t_dv_initial, method='L-BFGS-B', bounds=bounds
+                                , constraints=constraints
+                                )
+        print('values ', optimize_res.values())
+        print('status ', optimize_res.message)
         return optimize_res
 
 
