@@ -7,6 +7,7 @@ from scipy.interpolate import interp1d
 from scipy.signal import find_peaks
 from scipy.optimize import minimize, minimize_scalar
 import matplotlib.pyplot as plt
+from enumerator import Enumerator
 
 
 class Hohmann:
@@ -200,7 +201,7 @@ class Rendezvous:
         tempcraft = SpaceCraft(pos_begin, t_begin, vel_begin, self.spacecraft.system_bodies, self.spacecraft.unitc)
 
         # Integrate forward in orbit to have additional data points to use
-        ts_2, ys_2 = tempcraft.calculate_trajectory(expected_endtime=(t_begin + 2*(t_begin-ts_[0])))
+        ts_2, ys_2 = tempcraft.calculate_trajectory(expected_endtime=(t_begin + 5*(t_begin-ts_[0])))
         ts_ = np.append(ts_, ts_2)
         ys_ = np.append(ys_, ys_2, axis=1)
         ts_, u_idx = np.unique(ts_, return_index=True)
@@ -220,17 +221,16 @@ class Rendezvous:
         dv_initialburn = v_unit * (dv1h + (v_escape - la.norm(vel_rel_cb)))
 
         # function to minimize, input 1D array (time (1), delta-v (3)), so (4, ) length
+        next_number = Enumerator()
+
         def minimize_func(t_dv):
-            try:
-                i += 1
-            except NameError:
-                i = 0
+            i = next_number
             t_, dv_ = t_dv[0], t_dv[1:]
             y_interp = f_interp(t_)
             pos_, vel_ = y_interp[0:3], y_interp[3:]
             tempcraft.update(pos_, t_, vel_+dv_)
-            ts_temp, ys_temp = tempcraft.calculate_trajectory(th*2.5)
-            f_interp_temp = interp1d(ts_temp, ys_temp[0:3, :])
+            ts_temp, ys_temp = tempcraft.calculate_trajectory(th*2.5, max_stepsize=0.1, limit=300)
+            f_interp_temp = interp1d(ts_temp, ys_temp[0:3, :], kind='cubic')
             ts_interp = np.linspace(ts_temp[0], ts_temp[-1], 2000)
             ys_interp = f_interp_temp(ts_interp)
             # # Find places furthest from initial position # #
@@ -289,7 +289,6 @@ class Rendezvous:
             # Sun escape velocity
             mu_sun = self.target.parent.mass * self.target.unitc.m * cnst.G
             v_esc = np.sqrt(2*mu_sun/(la.norm(tempcraft.pos * tempcraft.unitc.d))) * 1/tempcraft.unitc.v
-            print('v_esc ', v_esc)
             return v_esc - speed
 
         def con2(t_dv):
@@ -314,10 +313,29 @@ class Rendezvous:
             else:
                 return 0
 
-        constraints = [# {'type': 'ineq', 'fun': con1},
-                       {'type': 'ineq', 'fun': con2},
-                       {'type': 'ineq', 'fun': con3}
-                       ]
+        dv_bound_u = 1.5 * la.norm(dv_initialburn)
+        dv_bound_l = 0.5 * la.norm(dv_initialburn)
+
+        def con5(t_dv):
+            # Demands dv_speed within dv_bound_l and dv_bound_u
+            dv_speed = la.norm(t_dv[1:])
+            if (dv_speed > dv_bound_u) and (dv_speed < dv_bound_l):
+                return 1
+            else:
+                return 0
+
+        def con6(t_dv):
+            # Demands dv to not be opposite direction initial velocity
+            vel_ = f_interp(t_dv[0])[3:]
+            dv_ = t_dv[1:]
+            return np.dot(vel_, dv_)
+
+        constraints = [
+            {'type': 'ineq', 'fun': con2},
+            {'type': 'ineq', 'fun': con3},
+            {'type': 'eq', 'fun': con5},
+            {'type': 'ineq', 'fun': con6}
+            ]
 
         # Initial values and boundaries
         t_dv_initial = np.empty((4, ))
@@ -331,15 +349,7 @@ class Rendezvous:
         bounds = ((ts_[0], ts_[-1]), (-dv_bound, dv_bound), (-dv_bound, dv_bound),
                   (-dv_bound, dv_bound))
         if la.norm(dv_initialburn) < dv_bound:
-            print()
-            print('within bound')
-            print('dv', la.norm(dv_initialburn))
-            print('dv_bound', dv_bound)
-            print('dv1h', dv1h)
-            print('v_escape_sun', v_escape_sun)
-            print('v_escape', v_escape)
-            print('norm(v_unit)', la.norm(v_unit))
-            print('norm(vel_begin)', la.norm(vel_begin))
+            pass
         else:
             print()
             print('initial dv not within bound')
@@ -357,6 +367,7 @@ class Rendezvous:
                                 # , constraints=constraints
                                 )
         # method L-BFGS-B converges, but seems to ignore constraints and bounds
+        print()
         print('target_distance', target_distance)
         print('values ', optimize_res.values())
         print('status ', optimize_res.message)
