@@ -28,9 +28,6 @@ vel = earth.get_barycentric_vel(t_0) + np.array([0, v_circ, 0])
 scraft = SpaceCraft(pos, t_0, vel, solar_system, unitc)
 
 # # Plot system with velocity vectors # #
-plt.figure()
-plt.xlim([-1.1, 1.1])
-plt.ylim([-1.1, 1.1])
 vel_vec_scr = 4 * vel  # / la.norm(vel)
 vel_vec_ear = 4*earth.get_barycentric_vel(t_0)  # / la.norm(earth.get_barycentric_vel(t_0))
 vel_vec_jup = 4*jupiter.get_barycentric_vel(t_0)  # / la.norm(jupiter.get_barycentric_vel(t_0))
@@ -38,6 +35,12 @@ vel_vec_sun = 4*sun.get_barycentric_vel(t_0)  # / la.norm(sun.get_barycentric_ve
 pos_ear = earth.get_barycentric(t_0)
 pos_jup = jupiter.get_barycentric(t_0)
 pos_sun = sun.get_barycentric(t_0)
+pos_scr_rel = pos - pos_ear
+vec_scr_rel = (vel_vec_scr - vel_vec_ear)
+"""
+plt.figure()
+plt.xlim([-1.1, 1.1])
+plt.ylim([-1.1, 1.1])
 plt.ylabel('y [AU]')
 plt.xlabel('x [AU]')
 plt.title('Initial System')
@@ -52,8 +55,6 @@ plt.plot(pos_sun[0], pos_sun[1], 'y.', markersize=19)
 plt.show(block=False)
 
 plt.figure()
-pos_scr_rel = pos - pos_ear
-vec_scr_rel = (vel_vec_scr - vel_vec_ear)
 plt.xlim([-distance-0.1*distance, distance+0.1*distance])
 plt.ylim([-distance-0.1*distance, distance+0.1*distance])
 plt.arrow(pos_scr_rel[0], pos_scr_rel[1], vec_scr_rel[0], vec_scr_rel[1], width=0.00002, color='b')
@@ -63,6 +64,7 @@ plt.title('Initial System relative to Earth')
 plt.plot(0, 0, 'g.', markersize=24)
 plt.plot(pos_scr_rel[0], pos_scr_rel[1], 'k.', markersize=8)
 plt.show(block=False)
+"""
 
 # # Make Hohmann transfer calculations # #
 hohmann = transfer.Hohmann(scraft, jupiter)
@@ -75,6 +77,7 @@ dv_initial = v_unit * (hohmann.dv1 + (v_esc - la.norm(vel_scr_rel)))
 ts, ys = hohmann.integrate(pos, vel, dv_initial, t_0)
 
 # # Plot result of integration # #
+"""
 plt.figure()
 plt.ylabel('y [AU]')
 plt.xlabel('x [AU]')
@@ -87,6 +90,7 @@ plt.plot(sun.get_barycentric(ts)[0, :], sun.get_barycentric(ts)[1, :], 'y')
 plt.plot(sun.get_barycentric(ts)[0, -1], sun.get_barycentric(ts)[1, -1], 'y.', markersize=20)
 plt.plot(ys[0, -1], ys[1, -1], 'k.', markersize=8)
 plt.show()
+"""
 
 # # Reset spacecraft # #
 scraft = SpaceCraft(pos, t_0, vel, solar_system, unitc)
@@ -105,6 +109,7 @@ scraft.update(ys[0:3, -1], ts[-1], ys[3:6, -1])
 ts, ys = hohmann.integrate(scraft.pos, scraft.velocity, dv_initial, scraft.t)
 
 # # Plot and show # #
+"""
 plt.figure()
 plt.ylabel('y [AU]')
 plt.xlabel('x [AU]')
@@ -117,6 +122,7 @@ plt.plot(sun.get_barycentric(ts)[0, :], sun.get_barycentric(ts)[1, :], 'y')
 plt.plot(sun.get_barycentric(ts)[0, -1], sun.get_barycentric(ts)[1, -1], 'y.', markersize=20)
 plt.plot(ys[0, -1], ys[1, -1], 'k.', markersize=8)
 plt.show()
+"""
 
 # # Reset and try to optimize result # #
 scraft = SpaceCraft(pos, t_0, vel, solar_system, unitc)
