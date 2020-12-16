@@ -127,4 +127,4 @@ plt.show()
 # # Reset and try to optimize result # #
 scraft = SpaceCraft(pos, t_0, vel, solar_system, unitc)
 rendezvous = transfer.Rendezvous(scraft, jupiter, sun)
-print(rendezvous.integrate_optimize(target_distance=0.01))
+print(rendezvous.integrate_optimize(target_distance=0.1))

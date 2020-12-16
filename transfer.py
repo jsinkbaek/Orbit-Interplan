@@ -214,16 +214,22 @@ class Rendezvous:
         _, dv1h, dv2h, th, _, _ = thohmann_.simple(body=self.parent)
         v_unit = vel_begin/la.norm(vel_begin, axis=0)
         cb_mu = tempcraft.current_body.mass * tempcraft.unitc.m * cnst.G
-        v_escape = np.sqrt(2*cb_mu/la.norm(pos_begin * tempcraft.unitc.d)) * 1/tempcraft.unitc.v
-        dv_initialburn = v_unit * (dv1h + (v_escape - la.norm(vel_begin)))
+        pos_rel_cb = tempcraft.get_cb_pos()
+        vel_rel_cb = vel_begin - tempcraft.current_body.get_barycentric_vel(t_begin)
+        v_escape = np.sqrt(2*cb_mu/la.norm(pos_rel_cb * tempcraft.unitc.d)) * 1/tempcraft.unitc.v
+        dv_initialburn = v_unit * (dv1h + (v_escape - la.norm(vel_rel_cb)))
 
         # function to minimize, input 1D array (time (1), delta-v (3)), so (4, ) length
         def minimize_func(t_dv):
+            try:
+                i += 1
+            except NameError:
+                i = 0
             t_, dv_ = t_dv[0], t_dv[1:]
             y_interp = f_interp(t_)
             pos_, vel_ = y_interp[0:3], y_interp[3:]
             tempcraft.update(pos_, t_, vel_+dv_)
-            ts_temp, ys_temp = tempcraft.calculate_trajectory(th*1.9)
+            ts_temp, ys_temp = tempcraft.calculate_trajectory(th*2.5)
             f_interp_temp = interp1d(ts_temp, ys_temp[0:3, :])
             ts_interp = np.linspace(ts_temp[0], ts_temp[-1], 2000)
             ys_interp = f_interp_temp(ts_interp)
@@ -231,7 +237,16 @@ class Rendezvous:
             pos_rel_ini = la.norm(f_interp_temp(ts_interp)-pos_.reshape(3, 1), axis=0)
             apoapsis_idx, _ = find_peaks(pos_rel_ini)
             if apoapsis_idx.size > 1:
+                print()
+                print('Apoapsis error, multiple found. Taking first one.')
+                print('apoapsis_idx', apoapsis_idx)
                 apoapsis_idx = apoapsis_idx[0]
+                print('apoapsis_idx[0]', apoapsis_idx)
+            if not apoapsis_idx:
+                print()
+                print('Apoapsis error, none found. Taking furthest point as apoapsis.')
+                apoapsis_idx = np.argmax(pos_rel_ini)
+                print('apoapsis_idx', apoapsis_idx)
             apoapsis_t = ts_interp[apoapsis_idx]
             apoapsis_pos = f_interp_temp(apoapsis_t)
             # # Minimize difference from target_distance # #
@@ -241,10 +256,10 @@ class Rendezvous:
             distance = la.norm(apoapsis_pos - target_pos[:, apoapsis_idx])
 
             # # Print and Plot # #
-            print('diff ', np.abs(distance - target_distance))
+            print()
+            print('t0', t_)
             print('dv', la.norm(dv_))
-            print('ts_temp[0]', ts_temp[0])
-            print('ts_temp[-1]', ts_temp[-1])
+            print('diff ', np.abs(distance - target_distance))
             plt.clf()
             plt.xlim([-6.5, 6.5])
             plt.ylim([-6.5, 6.5])
@@ -256,10 +271,14 @@ class Rendezvous:
             plt.plot(target_pos[0, 0], target_pos[1, 0], 'g.', markersize=12)
             plt.plot(target_pos[0, -1], target_pos[1, -1], 'm.', markersize=12)
             plt.plot(cb_pos[0, apoapsis_idx], cb_pos[1, apoapsis_idx], 'b.', markersize=8)
+            plt.plot(cb_pos[0, 0], cb_pos[1, 0], 'g.', markersize=8)
+            plt.plot(cb_pos[0, -1], cb_pos[1, -1], 'm.', markersize=8)
             plt.plot(ys_interp[0, :], ys_interp[1, :], 'k')
             plt.plot(ys_interp[0, apoapsis_idx], ys_interp[1, apoapsis_idx], 'k.', markersize=8)
+            plt.plot(ys_interp[0, 0], ys_interp[1, 0], 'k.', markersize=8)
             plt.draw()
             plt.pause(0.0001)
+            plt.savefig(f'fig/pic_{i}.png')
             return np.abs(distance - target_distance)
 
         # Constraints on minimizer
@@ -295,7 +314,7 @@ class Rendezvous:
             else:
                 return 0
 
-        constraints = [{'type': 'ineq', 'fun': con1},
+        constraints = [# {'type': 'ineq', 'fun': con1},
                        {'type': 'ineq', 'fun': con2},
                        {'type': 'ineq', 'fun': con3}
                        ]
@@ -308,24 +327,37 @@ class Rendezvous:
         cb_dist = la.norm(tempcraft.get_current_body().get_barycentric(t_begin)) * tempcraft.unitc.d
         parent_mu = self.target.parent.mass * self.target.unitc.m * cnst.G
         v_escape_sun = np.sqrt(2 * parent_mu/(la.norm(pos_begin * tempcraft.unitc.d))) * 1/tempcraft.unitc.v
-        dv_bound = v_escape_sun - la.norm(vel_begin) + v_escape
+        dv_bound = v_escape_sun + (v_escape - la.norm(vel_rel_cb))
         bounds = ((ts_[0], ts_[-1]), (-dv_bound, dv_bound), (-dv_bound, dv_bound),
                   (-dv_bound, dv_bound))
         if la.norm(dv_initialburn) < dv_bound:
+            print()
             print('within bound')
+            print('dv', la.norm(dv_initialburn))
+            print('dv_bound', dv_bound)
+            print('dv1h', dv1h)
+            print('v_escape_sun', v_escape_sun)
+            print('v_escape', v_escape)
+            print('norm(v_unit)', la.norm(v_unit))
+            print('norm(vel_begin)', la.norm(vel_begin))
         else:
+            print()
             print('initial dv not within bound')
             print('dv', la.norm(dv_initialburn))
             print('dv_bound', dv_bound)
             print('dv1h', dv1h)
             print('v_escape_sun', v_escape_sun)
+            print('v_escape', v_escape)
+            print('norm(v_unit)', la.norm(v_unit))
+            print('norm(vel_begin)', la.norm(vel_begin))
 
         # Call minimizer
         plt.figure()
         optimize_res = minimize(minimize_func, t_dv_initial, method='L-BFGS-B', bounds=bounds
-                                , constraints=constraints
+                                # , constraints=constraints
                                 )
         # method L-BFGS-B converges, but seems to ignore constraints and bounds
+        print('target_distance', target_distance)
         print('values ', optimize_res.values())
         print('status ', optimize_res.message)
 
