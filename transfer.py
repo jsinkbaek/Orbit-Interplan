@@ -8,6 +8,7 @@ from scipy.signal import find_peaks
 from scipy.optimize import minimize, minimize_scalar
 import matplotlib.pyplot as plt
 from enumerator import Enumerator
+from callbackinfo import CallbackInfo
 
 
 class Hohmann:
@@ -23,7 +24,8 @@ class Hohmann:
         if body is None:
             body = self.spacecraft.get_current_body(self.spacecraft.system_bodies)
         if r2 is None:
-            r2 = la.norm(self.target.get_barycentric(self.spacecraft.t), axis=0)
+            # r2 = la.norm(self.target.get_barycentric(self.spacecraft.t), axis=0)
+            r2 = self.target.a
         r1 = r1 * self.spacecraft.unitc.d
         r2 = r2 * self.spacecraft.unitc.d
         mass = body.mass * self.spacecraft.unitc.m
@@ -35,14 +37,16 @@ class Hohmann:
         r2 = r2 / self.spacecraft.unitc.d
         return dv, dv1, dv2, tH, r1, r2
 
-    def angular_alignment(self, target, parent, r1=None):
+    def angular_alignment(self, target, parent, r1=None, r2=None):
         """
         For calculating angular alignment between target planet for interplanetary Hohmann transfer rendezvous.
         Assumes no inclination difference between the spacecraft and target.
         """
         if r1 is None:
             r1 = la.norm(self.spacecraft.pos, axis=0)
-        r2 = la.norm(target.get_barycentric(self.spacecraft.t), axis=0)
+        if r2 is None:
+            # r2 = la.norm(target.get_barycentric(self.spacecraft.t), axis=0)
+            r2 = target.a
         r1 = r1 * self.spacecraft.unitc.d
         r2 = r2 * self.spacecraft.unitc.d
         pmass = parent.mass * parent.unitc.m
@@ -103,12 +107,9 @@ class Rendezvous:
         Assumes spacecraft position can be approximated with a body (e.g. Earth) in circular orbit around sun.
         """
         t_ini = self.spacecraft.t
-        # angle_ini = self.relative_angle_xy(t_ini)
-        # alpha_angle = self.hohmann.angular_alignment(self.target, self.parent)
         if timebound is None:
-            # sma_target = la.norm(self.target.get_barycentric(t_ini), axis=0) * self.target.unitc.d
             sma_self = la.norm(self.spacecraft.pos) * self.target.unitc.d
-            # Upper timelimit is then 2 orbits of self
+            # Upper timelimit is then 2 orbits of self around central coordinate
             timebound = 2 * 2*np.pi*np.sqrt(sma_self**3 / (cnst.G*self.parent.mass * self.parent.unitc.m))
             timebound = timebound * 1/self.target.unitc.t + t_ini
 
@@ -189,9 +190,10 @@ class Rendezvous:
         # t1 = find_tfirst(t1)
         return t1
 
-    def integrate_optimize(self, target_distance=0.1, timebound=None):
+    def integrate_optimize(self, target_distance=0.1, timebound=None, fudge_factor_initial_dv=1.0):
         # Calculate timestamp for estimated initial delta-v
-        t_initialburn = self.initialburn_interplan(timebound=timebound)
+        # initialburn_interplan seems to be unnecessary
+        t_initialburn = self.initialburn_simple(timebound=timebound)
         # Integrate until initial delta-v
         ts_, ys_ = self.spacecraft.calculate_trajectory(expected_endtime=t_initialburn)
         # Initialize temporary spacecraft copy to work with instead of primary one
@@ -222,9 +224,11 @@ class Rendezvous:
 
         # function to minimize, input 1D array (time (1), delta-v (3)), so (4, ) length
         next_number = Enumerator()
+        # To set tolerance on result
+        callback_info = CallbackInfo(ftol=0.15e-1)
 
         def minimize_func(t_dv):
-            i = next_number
+            i = next_number()
             t_, dv_ = t_dv[0], t_dv[1:]
             y_interp = f_interp(t_)
             pos_, vel_ = y_interp[0:3], y_interp[3:]
@@ -241,7 +245,6 @@ class Rendezvous:
                 print('Apoapsis error, multiple found. Taking first one.')
                 print('apoapsis_idx', apoapsis_idx)
                 apoapsis_idx = apoapsis_idx[0]
-                print('apoapsis_idx[0]', apoapsis_idx)
             if not apoapsis_idx:
                 print()
                 print('Apoapsis error, none found. Taking furthest point as apoapsis.')
@@ -254,6 +257,10 @@ class Rendezvous:
             parent_pos = self.target.parent.get_barycentric(ts_interp)
             cb_pos = tempcraft.get_current_body().get_barycentric(ts_interp)
             distance = la.norm(apoapsis_pos - target_pos[:, apoapsis_idx])
+            if distance < 5*target_distance:
+                distance_all = la.norm(f_interp_temp(ts_interp)-target_pos, axis=0)
+                apoapsis_idx = np.argmin(distance_all)
+                distance = distance_all[apoapsis_idx]
 
             # # Print and Plot # #
             print()
@@ -279,7 +286,13 @@ class Rendezvous:
             plt.draw()
             plt.pause(0.0001)
             plt.savefig(f'fig/pic_{i}.png')
+            callback_info.update(current_diff=np.abs(distance - target_distance))
             return np.abs(distance - target_distance)
+
+        def callback(t_dv):
+            callback_info.update(current_params=t_dv)
+            if callback_info.current_diff < callback_info.ftol:
+                raise StopIteration
 
         # Constraints on minimizer
         def con1(t_dv):
@@ -340,7 +353,7 @@ class Rendezvous:
         # Initial values and boundaries
         t_dv_initial = np.empty((4, ))
         t_dv_initial[0] = t_begin
-        t_dv_initial[1:4] = dv_initialburn
+        t_dv_initial[1:4] = fudge_factor_initial_dv * dv_initialburn
 
         cb_dist = la.norm(tempcraft.get_current_body().get_barycentric(t_begin)) * tempcraft.unitc.d
         parent_mu = self.target.parent.mass * self.target.unitc.m * cnst.G
@@ -363,17 +376,24 @@ class Rendezvous:
 
         # Call minimizer
         plt.figure()
-        optimize_res = minimize(minimize_func, t_dv_initial, method='L-BFGS-B', bounds=bounds
-                                # , constraints=constraints
-                                )
-        # method L-BFGS-B converges, but seems to ignore constraints and bounds
-        print()
-        print('target_distance', target_distance)
-        print('values ', optimize_res.values())
-        print('status ', optimize_res.message)
+        try:
+            optimize_res = minimize(minimize_func, t_dv_initial, method='L-BFGS-B', bounds=bounds
+                                    # , constraints=constraints
+                                    , callback=callback
+                                    , tol=1e-6
+                                    )
+            print()
+            print('target_distance', target_distance)
+            print('values ', optimize_res.values())
+            print('status ', optimize_res.message)
+            result = optimize_res.x
+        except StopIteration:
+            print('Exit due to function tolerance being met. Returns resulting t_dv parameters.')
+            result = callback_info.current_params
+        # method L-BFGS-B sometimes converges
 
         # # Plot Solution # #
         plt.show()
-        return optimize_res
+        return result
 
 
