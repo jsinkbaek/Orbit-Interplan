@@ -151,8 +151,6 @@ def rk45_step(f, t, yt, h):
 
     yh = yt + np.sum(k*b5, axis=1)
     err = yh - yt - np.sum(k*b4, axis=1)
-    # print('yh', yh)
-    # print('err', err)
     return yh, err
 
 

@@ -1,7 +1,6 @@
 import numpy as np
 from celestials import CelestialBody
 import numpy.linalg as la
-from scipy import constants as cnst
 from scipy.integrate import solve_ivp
 import matplotlib.pyplot as plt
 import ode

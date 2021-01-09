@@ -24,7 +24,6 @@ class Hohmann:
         if body is None:
             body = self.spacecraft.get_current_body(self.spacecraft.system_bodies)
         if r2 is None:
-            # r2 = la.norm(self.target.get_barycentric(self.spacecraft.t), axis=0)
             r2 = self.target.a
         r1 = r1 * self.spacecraft.unitc.d
         r2 = r2 * self.spacecraft.unitc.d
@@ -78,15 +77,9 @@ class Rendezvous:
         """
         pos_body1 = body1.get_barycentric(t)[0:2]
         pos_body2 = body2.get_barycentric(t)[0:2]
-        # angle_body1 = np.arctan(pos_body1[1]/pos_body1[0])
-        # angle_body2 = np.arctan(pos_body2[1]/pos_body2[0])
         angle_body1 = np.mod(np.arctan2(pos_body1[1], pos_body1[0]), 2*np.pi)
         angle_body2 = np.mod(np.arctan2(pos_body2[1], pos_body2[0]), 2*np.pi)
         return angle_body1 - angle_body2
-        # if np.cross(pos_body2, pos_body1) < 0:
-        #    return angle_body1 - angle_body2
-        # else:
-        #    return angle_body1 - angle_body2
 
     def initialburn_simple(self, timebound=None, plot=False):
         """
@@ -127,7 +120,6 @@ class Rendezvous:
         t_simple = self.initialburn_simple(timebound, plot)
 
         _, tH = self.hohmann.angular_alignment(self.target, self.parent)
-        target_pos = self.target.get_barycentric(t_simple+tH)             # location of target at approximate rendezvous
         rpos_cb = self.spacecraft.get_cb_pos()
         rel_distance_cb = la.norm(rpos_cb, axis=0) * self.spacecraft.unitc.d
         mu_cb = (cnst.G * self.spacecraft.get_current_body().mass * self.spacecraft.unitc.m)
