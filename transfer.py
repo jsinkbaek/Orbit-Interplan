@@ -71,18 +71,6 @@ class Rendezvous:
         self.target = target
         self.parent = parent        # parent of target (f.ex. Sun if target is Jupiter)
 
-    def relative_angle_xy(self, t):
-        """
-        Finds xy relative angle between spacecraft and target. Most useful for orbits close to the xy-plane.
-        Not useful for finding initialburn, as spacecraft position is static (needs to be integrated)
-        """
-        pos_target = self.target.get_barycentric(t)[0:2]
-        y_target, x_target = pos_target[1], pos_target[0]
-        angle_target = np.mod(np.arctan2(y_target, x_target), 2*np.pi)
-        y_scraft, x_scraft = self.spacecraft.pos[1], self.spacecraft.pos[0]
-        angle_scraft = np.mod(np.arctan2(y_scraft, x_scraft), 2*np.pi)
-        return angle_target - angle_scraft
-
     def relative_angle_planets(self, t, body1, body2):
         """
         Finds xy relative angle between two planets. Can be used to estimate relative angle between a target and space-

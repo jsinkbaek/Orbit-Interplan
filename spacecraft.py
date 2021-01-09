@@ -17,7 +17,6 @@ class SpaceCraft:
         self.current_body = self.get_current_body(system_bodies)
         self.pos_cb = self.get_cb_pos()
         self.velocity = initial_v
-        self.velocity_cb = self.get_cb_vel()
         self.system_bodies = system_bodies
         self.unitc = unit_converter
 
@@ -28,7 +27,6 @@ class SpaceCraft:
         self.t = t
         self.current_body = self.get_current_body(system_bodies)
         self.velocity = v
-        self.velocity_cb = self.get_cb_vel()
 
     def calculate_trajectory(self, expected_endtime, expected_endpos=None, system_bodies=None, max_stepsize=0.01,
                              scipy=False, limit=5000):
@@ -67,18 +65,6 @@ class SpaceCraft:
 
         return ts, ys
 
-    def circular_speed(self, body=None):
-        """
-        Estimates speed around indicated body if SpaceCraft is in circular orbit around it.
-        """
-        if body is None:
-            body = self.get_current_body()
-        relative_pos = self.pos - body.get_barycentric(self.t)
-        distance = la.norm(relative_pos, axis=0) * self.unitc.d
-        mass = body.mass * body.unitc.m
-        speed = np.sqrt(cnst.G * mass / distance)
-        return speed * 1/self.unitc.v
-
     def get_current_body(self, system_bodies=None):
         """
         Finds out which body SpaceCraft is primarily within sphere of influence of (in case of both moon and planet,
@@ -115,25 +101,10 @@ class SpaceCraft:
             elif len(planets) > 1:
                 raise ValueError('get_current_body. Spacecraft within SOI of multiple planets')
 
-    def get_2body_pos(self, t_wanted, body, pos=None, t=None, vel=None):
-        if t is None:
-            t = self.t
-        if pos is None:
-            pos = self.pos
-        if vel is None:
-            vel = self.velocity
-        relative_pos = pos - body.get_barycentric(t)
-        relative_vel = vel - body.get_barycentric_vel(t)
-
     def get_cb_pos(self):
         current_body_pos = self.current_body.get_barycentric(self.t)
         relative_pos = self.pos - current_body_pos
         return relative_pos
-
-    def get_cb_vel(self):
-        current_body_vel = self.current_body.get_barycentric_vel(self.t)
-        relative_vel = self.velocity - current_body_vel
-        return relative_vel
 
 
 
