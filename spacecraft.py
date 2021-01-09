@@ -30,7 +30,7 @@ class SpaceCraft:
     def calculate_trajectory(self, expected_endtime, expected_endpos=None, system_bodies=None, max_stepsize=0.01,
                              limit=5000):
         """
-        Calls ode.driver to integrate path until nearest expected_endpos.
+        Calls ode.driver to integrate path until nearest expected_endpos (or until expected_endtime if None).
         """
         if system_bodies is None:
             system_bodies = self.system_bodies
