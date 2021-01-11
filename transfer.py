@@ -25,6 +25,7 @@ class Hohmann:
             body = self.spacecraft.get_current_body(self.spacecraft.system_bodies)
         if r2 is None:
             r2 = self.target.a
+        print('body', body.name)
         r1 = r1 * self.spacecraft.unitc.d
         r2 = r2 * self.spacecraft.unitc.d
         mass = body.mass * self.spacecraft.unitc.m
@@ -106,9 +107,13 @@ class Rendezvous:
         peaks_idx = find_peaks(y_inverted)[0]
         if plot:
             plt.figure()
-            plt.plot(t_linspace, 1 - y_linspace / (2 * np.pi), 'r.')
-            plt.plot(t_linspace[peaks_idx], y_inverted[peaks_idx], 'b*')
-            plt.show()
+            plt.plot(t_linspace, y_linspace, 'r.', label='_nolegend_')
+            plt.plot(t_linspace[0], y_linspace[0], 'g*', markersize=20)
+            plt.plot(t_linspace[peaks_idx], y_linspace[peaks_idx], 'b*', markersize=20)
+            plt.xlabel('Time in JD - 2451545', fontsize=18)
+            plt.ylabel(r'$abs(\phi_J - \phi_\oplus - \alpha)$', fontsize=18)
+            plt.legend(['Initial time', 'Best time for burn'], fontsize=18)
+            plt.show(block=False)
         t_first = np.min(t_linspace[peaks_idx])
         return t_first
 

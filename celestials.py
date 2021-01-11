@@ -1,7 +1,7 @@
 import numpy as np
 from astropy.time import Time
 from astropy.coordinates import solar_system_ephemeris, EarthLocation
-from astropy.coordinates import get_body_barycentric, get_body_barycentric_posvel, get_body, get_moon
+from astropy.coordinates import get_body_barycentric, get_body_barycentric_posvel
 
 
 class CelestialBody:
