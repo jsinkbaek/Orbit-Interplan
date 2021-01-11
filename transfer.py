@@ -169,7 +169,7 @@ class Rendezvous:
                 plt.plot(cb_pos_[0] + xt[min_idx], cb_pos_[1] + yt[min_idx], 'g.')
                 sun_pos = self.target.parent.get_barycentric(t_first)
                 plt.plot(sun_pos[0], sun_pos[1], 'y.')
-                plt.show(block=False)
+                plt.show(block=True)
             return t_first
         t1 = find_tfirst(t_simple)
         # t1 = find_tfirst(t1)
@@ -200,10 +200,13 @@ class Rendezvous:
         # Estimate initial delta-v using simple Hohmann transfer equations and escape velocity of current_body
         thohmann_ = Hohmann(tempcraft, self.target)
         _, dv1h, dv2h, th, _, _ = thohmann_.simple(body=self.parent)
-        v_unit = vel_begin/la.norm(vel_begin, axis=0)
+        print('tempcraft.current_body.name', tempcraft.current_body.name)
+        vel_rel_cb = vel_begin - tempcraft.current_body.get_barycentric_vel(t_begin)
+        # Make direction of initial burn the same as current velocity relative to current body
+        v_unit = vel_rel_cb/la.norm(vel_rel_cb, axis=0)
         cb_mu = tempcraft.current_body.mass * tempcraft.unitc.m * cnst.G
         pos_rel_cb = tempcraft.get_cb_pos()
-        vel_rel_cb = vel_begin - tempcraft.current_body.get_barycentric_vel(t_begin)
+
         v_escape = np.sqrt(2*cb_mu/la.norm(pos_rel_cb * tempcraft.unitc.d)) * 1/tempcraft.unitc.v
         dv_initialburn = v_unit * (dv1h + (v_escape - la.norm(vel_rel_cb)))
 
@@ -329,10 +332,10 @@ class Rendezvous:
             return np.dot(vel_, dv_)
 
         constraints = [
-            {'type': 'ineq', 'fun': con2},
+            # {'type': 'ineq', 'fun': con2},
             {'type': 'ineq', 'fun': con3},
-            {'type': 'eq', 'fun': con5},
-            {'type': 'ineq', 'fun': con6}
+            {'type': 'eq', 'fun': con5}  # ,
+            # {'type': 'ineq', 'fun': con6}
             ]
 
         # Initial values and boundaries

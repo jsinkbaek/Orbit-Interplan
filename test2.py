@@ -11,7 +11,9 @@ import numpy.linalg as la
 unitc = UnitConverter(m_unit='m_earth', d_unit='au', t_unit='days', v_unit='au/d')
 sun = CelestialBody('sun', 332946.0487, 'star', None, 0.000000001, unitc)
 earth = CelestialBody('earth', 1.0, 'planet', sun, 1.000003, unitc)
+# earth = CelestialBody('earth', .00001, 'planet', sun, 1.000003, unitc)
 jupiter = CelestialBody('jupiter', 317.83, 'planet', sun, 5.2029, unitc)
+# jupiter = CelestialBody('jupiter', .00001, 'planet', sun, 5.2029, unitc)
 solar_system = CelestialGroup(sun, earth, jupiter)
 
 # # Find a time when earth crosses y=0 # #
@@ -80,12 +82,15 @@ hohmann = transfer.Hohmann(scraft, jupiter)
 _, dv1, _, _, _, _ = hohmann.simple(body=sun)
 print('dv1', dv1)
 print('hohmann.dv1', hohmann.dv1)
-v_unit = vel / la.norm(vel)
-v_esc = np.sqrt(2*earth_mu / (la.norm(pos_scr_rel)*unitc.d)) * 1/unitc.v
 vel_scr_rel = vel - earth.get_barycentric_vel(t_0)
+v_unit = vel_scr_rel / la.norm(vel_scr_rel)
+v_esc = np.sqrt(2*earth_mu / (la.norm(pos_scr_rel)*unitc.d)) * 1/unitc.v
 dv_initial = v_unit * (dv1 + (v_esc - la.norm(vel_scr_rel)))
 print('dv_initial', (dv1 + (v_esc - la.norm(vel_scr_rel))))
-
+print('dv_E_escape', v_esc - la.norm(vel_scr_rel))
+print('v_esc', v_esc)
+print('vel_scr_rel', la.norm(vel_scr_rel))
+print('v_circ', v_circ)
 # # Integrate resulting ODE # #
 ts0, ys0 = hohmann.integrate(pos, vel, dv_initial, t_0)
 ts1, ys1 = hohmann.integrate(pos, vel, dv_initial*0.8, t_0)
@@ -105,7 +110,7 @@ plt.plot(sun.get_barycentric(ts0)[0, -1], sun.get_barycentric(ts0)[1, -1], 'y.',
 plt.plot(ys0[0, -1], ys0[1, -1], 'k.', markersize=12, label='_nolegend_')
 plt.plot(ys1[0, -1], ys1[1, -1], 'k.', markersize=12, label='_nolegend_')
 plt.legend(['Trajectory 1*dv', 'Trajectory 0.8*dv', 'Earth', 'Jupiter', 'Sun'], fontsize=18)
-plt.show(block=False)
+plt.show(block=True)
 
 
 # # Reset spacecraft # #
@@ -113,7 +118,7 @@ scraft = SpaceCraft(pos, t_0, vel, solar_system, unitc)
 
 # # Create Rendezvous object # #
 rendezvous = transfer.Rendezvous(scraft, jupiter, sun)
-t1 = rendezvous.initialburn_simple(plot=True)
+t1 = rendezvous.initialburn_interplan(plot=True)
 print('t_0', t_0)
 print('t1', t1)
 
